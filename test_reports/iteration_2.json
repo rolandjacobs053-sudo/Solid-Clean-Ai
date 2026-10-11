@@ -1,0 +1,33 @@
+{
+  "summary": "Phase 1 Solid Clean testing complete. Backend: 13/13 pytest tests passed covering SaaS gating (status closed, signup 403, platform toggle), Solid Clean branding (logo /brand/solidclean-logo.png, phone 020 3728 4419, brand colours #023F00/#8F7E22), absence of 'airbnb'/'parking' in public config/pricing, service price edit -> price_history + audit log + live preview reflects change, duplicate/activate/deactivate/online_booking visibility rules, pricing modes fixed=single-line vs 'from'=needs_review, promo TEST10 applies / invalid shows 'Promo code not valid', short-notice surcharge line, 14 policies listed, publish blocked by [REVIEW REQUIRED] markers (400), publish success without markers + public /config visibility, booking w/o accepted_policies -> 409 when require_acceptance=true, staff role 403 on PUT /admin/settings and policy publish. Frontend (Playwright): login has NO signup link, admin settings page renders with services editor + history/audit tabs, policies page lists 14 items with [REVIEW REQUIRED] warning on 'booking', regression (overview, leads, bookings) all load, public /c/solid-clean/quote renders Solid Clean logo + phone + Policies link in header + 'Promo code not valid' error inline, no 'airbnb'/'parking' leaks, live price preview reacts to inputs. Platform /platform shows 'SaaS launch: CLOSED' banner + 'Open sign-ups' toggle (left OFF). Rate limit (/api/auth/login > 60/min -> 429) was NOT exercised live to avoid locking the testing IP; implementation inspected and present in server.py (middleware with 60/min window on /api/auth/).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_solid_clean_phase1.py",
+    "/app/backend/tests/test_saas.py",
+    "/app/test_reports/pytest/phase1.xml"
+  ],
+  "action_items": [
+    "RESTORE policy 'property_condition' for Solid Clean (slug solid-clean): the test published it (version 1) and the test suite leaves it published with require_acceptance=false. If main agent wants the pre-test state, delete the policy's published_version/published_content and clear 'versions' array in Mongo for key='property_condition'.",
+    "Price history and audit_log will contain TEST_ entries from the edit-and-restore cycle (base +£7 then restored). Harmless but note for cleanup if desired.",
+    "Rate-limit 429 case not executed live (would block testing IP). Code path verified in server.py (60 req / 60s on /api/auth/*). Main agent can self-verify with a scripted burst if needed."
+  ],
+  "critical_code_review_comments": [
+    "routes_public.py:259 - stripe_webhook still uses json.loads(str(event['data']['object'])) (brittle round-trip). Prefer event['data']['object'].to_dict() or dict(obj). Carried over from iteration_1.",
+    "routes_public.py create_booking: result['status']=='needs_review' is rejected with 422, but for 'from' pricing_mode services, UI already routes users to the 'Send enquiry' quote endpoint. OK, but no user-visible test for the 422 branch.",
+    "routes_policies.py publish: version is captured as draft_content at publish time; versions[] grows unbounded (no cap). Minor long-term concern.",
+    "pricing.py compute_quote: short_notice uses .days attribute from sn even when sn['value']==0 is falsy; works, but a negative value would be silently accepted. Add value>=0 validation at settings write.",
+    "routes_admin.py write_settings has no validation that service['key'] is unique after duplication - a buggy UI could insert dupes. Enforce in backend with a quick set check.",
+    "frontend/PricingEditors.jsx uses Date.now() for new keys; two rapid clicks could collide. Acceptable for MVP."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_solid_clean_phase1.py (new, 13 tests)"
+  ],
+  "success_rate": {"backend": "100% (13/13 phase1 + 34/34 prior saas tests still green)", "frontend": "100% (10/10 checks)"},
+  "test_credentials": "Solid Clean owner admin@solidcleanltd.com / SolidClean#2026 ; Platform admin gilctei@hotmail.com / CleanOps#2026",
+  "seed_data_creation": "Test suite creates TEST_staff_<uuid>@example.com users (left deactivated active=false) per run and TEST_dup_<x> service during the settings fixture (restored on teardown). No persistent test-booking rows created.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend regression lives in /app/backend/tests/test_solid_clean_phase1.py and /app/backend/tests/test_saas.py. test_solid_clean_phase1.py uses a settings_snapshot fixture that reads full /admin/settings, mutates, then PUTs the original back on teardown - safe to re-run. The property_condition policy will be already published after first run; the publish-success test re-publishes v2+ each run, which is intended (version history grows). Rate-limit test deliberately omitted. SaaS toggle test flips signup_enabled on then back off within one test; if it fails mid-way signups could be left open - check /api/saas/status after any failure.",
+  "rca of the issue": "N/A - no bugs found. All Phase 1 acceptance criteria are green."
+}

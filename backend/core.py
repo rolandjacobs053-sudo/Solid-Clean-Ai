@@ -187,8 +187,13 @@ async def require_member_any(request: Request) -> dict:
     return {"user": user, "company": company}
 
 
+STAFF_PATHS = ("/api/admin/bookings", "/api/admin/policies")
+
+
 async def require_admin(request: Request) -> dict:
     ctx = await require_member_any(request)
+    if ctx["user"]["role"] == "staff" and not request.url.path.startswith(STAFF_PATHS):
+        raise HTTPException(403, "Cleaners and staff can only access their assigned jobs")
     state = access_state(ctx["company"])
     if not state["ok"]:
         raise HTTPException(402, state["reason"])

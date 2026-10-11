@@ -21,7 +21,7 @@ function Banner({ company }) {
 export default function AdminLayout() {
   const { user, logout } = useAuth();
   const c = user.company;
-  const allowed = ([, , , f]) => !f || c.comped || c.features.includes(f);
+  const allowed = ([to, , , f]) => (user.role === "staff" ? ["bookings", "policies"].includes(to) : !f || c.comped || c.features.includes(f));
   const link = ({ isActive }) => `flex items-center gap-3 whitespace-nowrap rounded-xl px-3 py-2 text-sm transition-colors ${isActive ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`;
   return (
     <div className="min-h-screen bg-[#f6f7f9]" data-testid="admin-layout">

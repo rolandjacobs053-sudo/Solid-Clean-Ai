@@ -1,8 +1,11 @@
 import { useParams } from "react-router-dom";
 
+export const DEFAULT_SLUG = "solid-clean";
+
 export const useTenant = () => {
-  const { slug } = useParams();
-  return { slug, base: `/c/${slug}`, pub: `/public/${slug}` };
+  const { slug: param } = useParams();
+  const slug = param || DEFAULT_SLUG;
+  return { slug, base: param ? `/c/${slug}` : "", pub: `/public/${slug}` };
 };
 
 export const FEATURES = [

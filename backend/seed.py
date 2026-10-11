@@ -6,10 +6,11 @@ from pricing import DEFAULT_SETTINGS, SERVICE_DEFAULTS, compute_quote
 from routes_policies import policy_seed_docs
 
 SOLID_BUSINESS = {"name": "Solid Clean Ltd", "website": "https://solidcleanltd.com", "phone": "020 3728 4419", "logo_url": "/brand/solidclean-logo.png",
-                  "brand_primary": "#023F00", "brand_accent": "#8F7E22", "payment_mode": "full_upfront", "online_payments": True}
+                  "brand_primary": "#023F00", "brand_accent": "#8F7E22", "payment_mode": "full_upfront", "online_payments": True, "service_areas_text": "London and Surrey"}
 BUSINESS_DEFAULTS = {"phone": "[Business phone]", "logo_url": "", "brand_primary": "#0F766E", "brand_accent": "#0F172A", "payment_mode": "full_upfront",
                      "payment_instructions": "", "online_payments": True, "business_hours": "[Business hours]", "invoice_legal_name": "[Legal company name]",
-                     "invoice_address": "[Registered address]", "company_number": "[Company number]", "vat_registered": False, "vat_number": ""}
+                     "invoice_address": "[Registered address]", "company_number": "[Company number]", "vat_registered": False, "vat_number": "",
+                     "about_text": "", "contact_email": "[Contact email]", "service_areas_text": ""}
 
 
 async def migrate_company(company: dict):
@@ -21,7 +22,7 @@ async def migrate_company(company: dict):
         p.pop("parking_surcharge", None)
         p.setdefault("short_notice", {"days": 2, "type": "percent", "value": 0})
         p.setdefault("promo_codes", [])
-        biz = {**BUSINESS_DEFAULTS, **s["business"], **(SOLID_BUSINESS if company["slug"] == "solid-clean" else {})}
+        biz = {**BUSINESS_DEFAULTS, **(SOLID_BUSINESS if company["slug"] == "solid-clean" else {}), **s["business"]}
         biz.pop("booking_page", None)
         await db.settings.update_one({"_id": s["_id"]}, {"$set": {"pricing": p, "business": biz}})
     for col in ("quotes", "bookings"):

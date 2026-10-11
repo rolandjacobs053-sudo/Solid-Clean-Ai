@@ -143,16 +143,20 @@ async def patch_lead(lead_id: str, body: LeadPatch):
 
 
 @router.get("/bookings")
-async def list_bookings(status: str = ""):
+async def list_bookings(status: str = "", ctx=Depends(require_admin)):
     query = {"status": status} if status else {"status": {"$nin": ["abandoned"]}}
+    if ctx["user"]["role"] == "staff":
+        query["assigned_to"] = str(ctx["user"]["_id"])
     return outs(await tdb.bookings.find(query).sort([("date", -1), ("slot", 1)]).to_list(500))
 
 
 @router.patch("/bookings/{booking_id}")
-async def patch_booking(booking_id: str, body: BookingPatch):
+async def patch_booking(booking_id: str, body: BookingPatch, ctx=Depends(require_admin)):
     b = await tdb.bookings.find_one({"_id": oid(booking_id)})
     if not b:
         raise HTTPException(404, "Booking not found")
+    if ctx["user"]["role"] == "staff" and (b.get("assigned_to") != str(ctx["user"]["_id"]) or body.status != "completed" or body.assigned_to is not None):
+        raise HTTPException(403, "Staff can only mark their own assigned jobs as completed")
     if body.assigned_to is not None:
         from core import db
         staff = await db.users.find_one({"_id": oid(body.assigned_to), "company_id": b["company_id"]}) if body.assigned_to else None

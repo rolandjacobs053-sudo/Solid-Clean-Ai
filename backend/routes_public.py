@@ -101,7 +101,30 @@ async def public_config(slug: str):
             "ai_receptionist": company.get("comped") or "ai_receptionist" in feats,
             "policies": [{k: p.get(k) for k in ("key", "title", "published_version", "published_content", "effective_date", "require_acceptance")}
                          async for p in tdb.policies.find({"audience": "public", "published_version": {"$gt": 0}}).sort("order", 1)],
-            "business": {k: s["business"].get(k) for k in ("name", "website", "online_payments", "phone", "logo_url", "brand_primary", "brand_accent")}}
+            "business": {k: s["business"].get(k) for k in ("name", "website", "online_payments", "phone", "logo_url", "brand_primary", "brand_accent", "about_text", "contact_email", "service_areas_text", "business_hours")}}
+
+
+class ContactIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    email: str = Field(pattern=EMAIL_RE)
+    phone: str = Field("", max_length=30)
+    message: str = Field(min_length=2, max_length=3000)
+    marketing_consent: bool = False
+
+
+@public.post("/contact")
+async def contact(body: ContactIn):
+    s = await get_settings()
+    lead_id = await upsert_lead(body.model_dump(), "website", f"Contact form: {body.message[:300]}", {"marketing_consent": body.marketing_consent})
+    await notify_owner(s, "New website contact message", f"{body.name} {body.phone} {body.email}: {body.message}", lead_id)
+    return {"ok": True}
+
+
+@public.get("/reviews")
+async def public_reviews():
+    rows = await tdb.reviews.find({"demo": {"$ne": True}}).sort("review_date", -1).to_list(100)
+    return [{"author": r["author"], "rating": r["rating"], "text": r.get("text", ""), "review_date": r["review_date"], "platform": r.get("platform"),
+             "response": r.get("response") if r.get("status") == "approved" else ""} for r in rows]
 
 
 @public.post("/quote/preview")

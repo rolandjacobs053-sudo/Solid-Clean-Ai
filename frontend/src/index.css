@@ -53,6 +53,14 @@ h1, h2, h3, h4, .font-display {
     color: #0f766e;
 }
 
+.brand-site .bg-teal-600, .brand-site .bg-slate-900 { background-color: #023F00 !important; }
+.brand-site .hover\:bg-teal-700:hover { background-color: #8F7E22 !important; }
+.brand-site .text-teal-700, .brand-site .text-teal-800 { color: #023F00 !important; }
+.brand-site .border-teal-600 { border-color: #8F7E22 !important; }
+.brand-site .ring-teal-600 { --tw-ring-color: #8F7E22 !important; }
+.brand-site .bg-teal-50, .brand-site .bg-teal-100 { background-color: #f6f3e4 !important; }
+.brand-site .eyebrow { color: #8F7E22; }
+
 @layer base {
     :root {
         --background: 240 20% 98%;

@@ -32,6 +32,8 @@ import Plans from "@/pages/platform/Plans";
 import Payments from "@/pages/platform/Payments";
 import Quotation from "@/pages/platform/Quotation";
 import Proposal from "@/pages/admin/Proposal";
+import SiteLayout from "@/pages/site/SiteLayout";
+import { AboutPage, AreasPage, ContactPage, FaqPage, HomePage, PolicyPage, ReviewsPage, ServiceDetail, ServicesPage } from "@/pages/site/SitePages";
 import Policies from "@/pages/admin/Policies";
 import PublicPolicies from "@/pages/PublicPolicies";
 
@@ -62,8 +64,9 @@ const CompanyArea = () => {
   const { user } = useAuth();
   const loc = useLocation();
   if (user === null) return <Loading />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/admin/login" replace />;
   if (user.role === "platform_admin") return <Navigate to="/platform" replace />;
+  if (user.role === "staff" && !/^\/admin\/(bookings|policies)/.test(loc.pathname)) return <Navigate to="/admin/bookings" replace />;
   if (!user.company.access.ok && loc.pathname !== "/admin/billing") return <Navigate to="/admin/billing" replace />;
   return <AdminLayout />;
 };
@@ -81,9 +84,27 @@ function App() {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Root />} />
+            <Route element={<SiteLayout />}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/services" element={<ServicesPage />} />
+              <Route path="/services/:key" element={<ServiceDetail />} />
+              <Route path="/quote" element={<QuotePage />} />
+              <Route path="/book" element={<Navigate to="/quote" replace />} />
+              <Route path="/payment/:result" element={<PaymentResult />} />
+              <Route path="/unsubscribe" element={<Unsubscribe />} />
+              <Route path="/faq" element={<FaqPage />} />
+              <Route path="/areas" element={<AreasPage />} />
+              <Route path="/reviews" element={<ReviewsPage />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/contact" element={<ContactPage />} />
+              <Route path="/policies" element={<PublicPolicies />} />
+              <Route path="/privacy" element={<PolicyPage policyKey="privacy" />} />
+              <Route path="/cookies" element={<PolicyPage policyKey="cookies" />} />
+              <Route path="/terms" element={<PolicyPage policyKey="terms" />} />
+            </Route>
             <Route path="/login" element={<AdminLogin />} />
-            <Route path="/admin/login" element={<Navigate to="/login" replace />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/app" element={<Root />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/c/:slug" element={<BookingLayout />}>
               <Route index element={<Navigate to="quote" replace />} />
