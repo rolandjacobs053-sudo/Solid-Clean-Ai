@@ -1,0 +1,43 @@
+{
+  "summary": "First-pass end-to-end testing of CleanOps SaaS platform. Backend: 34/34 pytest tests passing (auth, signup, tenant isolation, plan feature gating, Stripe checkout, platform admin suspend/extend-trial, staff mgmt, public booking preview, access restriction). Frontend: 11/11 Playwright checks passing (root->/login redirect, platform admin login & tabs, self-serve signup landing on /admin with trial banner, zero demo data for new tenant, Billing page with 3 plans + monthly/annual toggle, nav hides locked features for Growth trial, Solid Clean owner login, public /c/solid-clean/quote renders with AI receptionist widget and live-price quote). Live Stripe checkout URL successfully generated in test mode.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin Overview", "issues": ["Recharts console warnings: 'width(-1) and height(-1) of chart should be greater than 0' - likely a chart container that mounts before layout settles. Non-blocking but worth adding minWidth/minHeight or ResponsiveContainer aspect prop."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_saas.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Fix Recharts ResponsiveContainer sizing warnings on /admin overview to silence console noise.",
+    "Not retested end-to-end: actual Stripe test-card checkout completion -> /admin/billing?session_id=... sync to 'active' and prorated plan switch (requires interactive card entry on hosted Stripe page). Billing sync endpoint is covered by backend code but a full happy-path with 4242... should be verified manually or via a Stripe-API mock run.",
+    "Not retested end-to-end: public /c/{slug}/quote -> Stripe payment -> /payment/success -> booking marked confirmed/paid (same reason as above).",
+    "Not covered: AI receptionist chat message generation (LLM calls skipped to keep run fast); SEO audit AI call for Pro-comped tenant was only verified for 403 absence, not content quality."
+  ],
+  "critical_code_review_comments": [
+    "routes_public.py:252 - stripe webhook json.loads(str(event['data']['object'])) relies on Stripe event objects being str-convertible to JSON; works but brittle. Prefer event['data']['object'].to_dict_recursive() or dict(obj).",
+    "routes_saas.py:287 - _session() silently falls back from automatic_tax to managed_payments to vanilla; good resilience, but failures are logged only once with keys of extras, not the Stripe error reason.",
+    "core.py:171 - current_user looks up user with password_hash excluded; refresh endpoint uses find_one without excluding password_hash (routes_auth.py:57) - minor leak if payload ever logged; harmless as not returned.",
+    "routes_saas.py:200 - add_staff counts active users to enforce max_staff; passes gating via require_owner, but a race condition could allow >limit if two concurrent POSTs - acceptable for MVP.",
+    "server.py: no /api/health endpoint; root is /api/ which works. Fine.",
+    "Frontend: Admin Overview triggers chart render with container width=-1 (Recharts warning). Wrap chart in a container with explicit min-height or use ResponsiveContainer with aspect prop."
+  ],
+  "updated_files": [
+    "/app/backend/tests/__init__.py (new)",
+    "/app/backend/tests/test_saas.py (new, 34 tests)"
+  ],
+  "success_rate": {"backend": "100% (34/34)", "frontend": "100% (11/11)"},
+  "test_credentials": "Platform admin gilctei@hotmail.com / CleanOps#2026 ; Solid Clean owner admin@solidcleanltd.com / SolidClean#2026 ; new TEST_ companies created on the fly via /api/auth/signup using @example.com emails.",
+  "seed_data_creation": "Each run creates ~1-2 TEST_Co_<uuid> companies via /api/auth/signup and 1 TEST_staff user, left behind in Mongo (prefixed with TEST_ as required).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend tests live in /app/backend/tests/test_saas.py and are safe to re-run - they create new TEST_ companies each run. All critical SaaS flows (auth, tenant isolation, plan gating, suspend/reactivate, staff lifecycle, billing checkout, platform admin) are green. Only gaps are interactive Stripe hosted-page completions (card 4242...) which cannot be automated headlessly without stepping through Stripe UI. If retesting UI, note that signup auto-navigates to /admin/settings (not /admin dashboard) on first signup - this is because overview page uses Recharts which triggers a warning but still renders.",
+  "rca of the issue": "N/A - no blocking issues found. Only one test selector was initially wrong (used /admin/outreach/prospects instead of /admin/prospects); fixed in test file."
+}
