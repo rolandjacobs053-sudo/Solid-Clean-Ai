@@ -7,14 +7,18 @@ load_dotenv(Path(__file__).parent / ".env")
 import asyncio
 import logging
 import os
+import time
+from collections import defaultdict, deque
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
 import routes_admin
 import routes_auth
 import routes_chat
 import routes_growth
+import routes_policies
 import routes_public
 import routes_saas
 import routes_tools
@@ -27,8 +31,26 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="CleanOps")
 for r in (routes_auth.router, routes_saas.router, routes_saas.platform, routes_public.router, routes_public.public, routes_chat.router,
-          routes_admin.router, routes_growth.router, routes_growth.outreach, routes_growth.reviews_r, routes_tools.router):
+          routes_admin.router, routes_growth.router, routes_growth.outreach, routes_growth.reviews_r, routes_tools.router, routes_policies.router):
     app.include_router(r)
+
+HITS = defaultdict(deque)
+LIMITS = (("/api/auth/", 60), ("/api/public/", 180))
+
+
+@app.middleware("http")
+async def rate_limit(request: Request, call_next):
+    path = request.url.path
+    limit = next((n for p, n in LIMITS if path.startswith(p)), None)
+    if limit:
+        ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "x")).split(",")[0].strip()
+        q, t = HITS[(ip, path.split("/")[2])], time.monotonic()
+        while q and t - q[0] > 60:
+            q.popleft()
+        if len(q) >= limit:
+            return JSONResponse({"detail": "Too many requests - please wait a minute and try again."}, status_code=429)
+        q.append(t)
+    return await call_next(request)
 
 app.add_middleware(
     CORSMiddleware,

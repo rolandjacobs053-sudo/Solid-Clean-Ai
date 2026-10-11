@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { DemoTag, Empty, Notice, PageHeader, StatusBadge, useLoad } from "@/components/admin/ui";
 import { api, errMsg, fmtDate, label } from "@/lib/api";
 
-const SECTORS = ["letting_agent", "estate_agent", "property_management", "landlord", "airbnb_management", "office", "gym", "construction"];
+const SECTORS = ["letting_agent", "estate_agent", "property_management", "landlord", "office", "gym", "construction"];
 const STATUSES = ["to_contact", "contacted", "replied", "interested", "meeting", "proposal", "won", "not_interested", "opted_out"];
 
 function AddProspect({ open, setOpen, onDone }) {

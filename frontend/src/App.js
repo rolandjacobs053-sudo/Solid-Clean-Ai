@@ -32,6 +32,8 @@ import Plans from "@/pages/platform/Plans";
 import Payments from "@/pages/platform/Payments";
 import Quotation from "@/pages/platform/Quotation";
 import Proposal from "@/pages/admin/Proposal";
+import Policies from "@/pages/admin/Policies";
+import PublicPolicies from "@/pages/PublicPolicies";
 
 function BookingLayout() {
   const { slug, base, pub } = useTenant();
@@ -41,7 +43,7 @@ function BookingLayout() {
   if (error) return <div className="p-16 text-center text-slate-600" data-testid="booking-unavailable">{error}</div>;
   return (
     <>
-      <BookingHeader name={cfg?.business.name} base={base} />
+      <BookingHeader cfg={cfg} base={base} />
       <Outlet context={cfg} />
       {cfg?.ai_receptionist && <ChatWidget key={slug} />}
     </>
@@ -88,6 +90,7 @@ function App() {
               <Route path="quote" element={<QuotePage />} />
               <Route path="payment/:result" element={<PaymentResult />} />
               <Route path="unsubscribe" element={<Unsubscribe />} />
+              <Route path="policies" element={<PublicPolicies />} />
             </Route>
             <Route path="/admin" element={<CompanyArea />}>
               <Route index element={<Overview />} />
@@ -101,6 +104,7 @@ function App() {
               <Route path="comms" element={<Comms />} />
               <Route path="staff" element={<Staff />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="policies" element={<Policies />} />
               <Route path="billing" element={<Billing />} />
             </Route>
             <Route path="/platform" element={<PlatformArea />}>

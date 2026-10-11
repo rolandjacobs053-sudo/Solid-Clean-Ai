@@ -35,12 +35,13 @@ SERVICE KEYS: {services}
 PROPERTY TYPE KEYS: {ptypes}
 CONDITION KEYS: {conds}
 EXTRA KEYS: {extras}
-PARKING KEYS: free, paid, none
+PUBLISHED POLICIES (quote only these; never change them):
+{policies}
 
 STRICT RULES:
 1. NEVER state, estimate or guess a price. Prices come ONLY from the quoting system.
-2. To quote, collect: service, property type, bedrooms, bathrooms, living rooms, condition, extras (can be none), parking, postcode. Ask one or two questions at a time. When you have everything, write a short line saying you're calculating it, then on its own line output exactly:
-<<QUOTE {{"service":"key","property_type":"key","bedrooms":0,"bathrooms":0,"living_rooms":0,"condition":"key","extras":[],"parking":"key","postcode":"..."}}>>
+2. To quote, collect: service, property type, bedrooms, bathrooms, living rooms, condition, extras (can be none), postcode. Never ask about parking. Ask one or two questions at a time. When you have everything, write a short line saying you're calculating it, then on its own line output exactly:
+<<QUOTE {{"service":"key","property_type":"key","bedrooms":0,"bathrooms":0,"living_rooms":0,"condition":"key","extras":[],"postcode":"..."}}>>
 The customer then sees the exact quote card and you receive the result as a SYSTEM note.
 3. NEVER confirm a booking or promise a date/time. To book, ask the customer to press "Book this quote" on the quote card - live availability is checked there and payment confirms the booking.
 4. As soon as you know the customer's name AND phone or email, output once:
@@ -64,12 +65,13 @@ def _sse(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
 
 
-def _system(s: dict, conv: dict) -> str:
+def _system(s: dict, conv: dict, policies: str = "") -> str:
     p = s["pricing"]
     keys = lambda items: ", ".join(f"{i['key']} ({i['name']})" for i in items)
     kb = "\n".join(f"- Q: {k['q']} A: {k['a']}" for k in s["knowledge_base"])
     transcript = "\n".join(f"{m['role'].upper()}: {m['text']}" for m in conv["messages"][-30:])
-    return (SYSTEM.format(biz=s["business"]["name"], kb=kb, services=keys(p["services"]), ptypes=keys(p["property_types"]),
+    services = [x for x in p["services"] if x.get("active", True) and x.get("online_booking", True)]
+    return (SYSTEM.format(biz=s["business"]["name"], kb=kb, services=keys(services), policies=policies or "(none published)", ptypes=keys(p["property_types"]),
                           conds=keys(p["conditions"]), extras=keys(p["extras"]))
             + f"\n\nCONVERSATION SO FAR:\n{transcript or '(none)'}")
 
@@ -124,7 +126,8 @@ async def _handle_tags(full: str, conv: dict, s: dict):
 async def send_message(cid: str, body: MessageIn):
     conv = await _conv(cid)
     s = await get_settings()
-    chat = new_chat(_system(s, conv), f"conv-{cid}")
+    pols = "\n".join([f"- {x['title']}: {x['published_content'][:600]}" async for x in tdb.policies.find({"audience": "public", "published_version": {"$gt": 0}})])
+    chat = new_chat(_system(s, conv, pols), f"conv-{cid}")
     await tdb.conversations.update_one({"_id": conv["_id"]}, {"$push": {"messages": {"role": "user", "text": body.text, "at": now_iso()}}})
 
     async def gen():

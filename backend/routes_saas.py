@@ -154,8 +154,30 @@ async def _unique_slug(name: str) -> str:
     return slug
 
 
+async def saas_open() -> bool:
+    ps = await db.platform_settings.find_one({"key": "main"}) or {}
+    return bool(ps.get("signup_enabled", False))
+
+
+@router.get("/saas/status")
+async def saas_status():
+    return {"signup_enabled": await saas_open()}
+
+
+class PlatformSettingsIn(BaseModel):
+    signup_enabled: bool
+
+
+@platform.patch("/settings")
+async def platform_settings(body: PlatformSettingsIn):
+    await db.platform_settings.update_one({"key": "main"}, {"$set": {"signup_enabled": body.signup_enabled, "updated_at": now_iso()}}, upsert=True)
+    return {"ok": True}
+
+
 @router.post("/auth/signup")
 async def signup(body: SignupIn, response: Response):
+    if not await saas_open():
+        raise HTTPException(403, "New company sign-ups are not open yet.")
     email = body.email.lower().strip()
     if await db.users.find_one({"email": email}):
         raise HTTPException(409, "An account with this email already exists")
@@ -166,6 +188,8 @@ async def signup(body: SignupIn, response: Response):
     settings = copy.deepcopy(DEFAULT_SETTINGS)
     settings["business"]["name"] = company["name"]
     await db.settings.insert_one({**settings, "company_id": cid})
+    from routes_policies import policy_seed_docs
+    await db.policies.insert_many([{**d, "company_id": cid} for d in policy_seed_docs(company["name"])])
     user = {"email": email, "password_hash": hash_password(body.password), "name": body.name, "role": "owner",
             "company_id": cid, "active": True, "job_role": "Owner", "created_at": now_iso()}
     uid = str((await db.users.insert_one(user)).inserted_id)
@@ -264,6 +288,8 @@ async def billing_sync(session_id: str = "", ctx=Depends(require_member_any)):
 async def billing_checkout(body: CheckoutIn, ctx=Depends(require_owner)):
     company, user = ctx["company"], ctx["user"]
     cid = str(company["_id"])
+    if not company.get("comped") and not await saas_open():
+        raise HTTPException(403, "Subscriptions are not launched yet - no charges can be made until the platform owner approves launch.")
     if not await db.plans.find_one({"key": body.plan_key, "active": True}):
         raise HTTPException(404, "Plan not found")
     prices = (await asyncio.to_thread(stripe.Price.list, lookup_keys=[_lookup(body.plan_key, body.interval)], active=True, limit=1)).data
@@ -371,7 +397,7 @@ async def platform_overview():
         counts[c.get("subscription_status", "none")] = counts.get(c.get("subscription_status", "none"), 0) + 1
     mrr = round(sum(_mrr(c, plans) for c in companies), 2)
     paid = await db.saas_invoices.find({"status": "paid"}).to_list(10000)
-    return {"companies": len(companies), "by_status": counts, "mrr": mrr, "arr": round(mrr * 12, 2),
+    return {"companies": len(companies), "by_status": counts, "mrr": mrr, "arr": round(mrr * 12, 2), "signup_enabled": await saas_open(),
             "signups_30d": len([c for c in companies if c["created_at"] > (now() - timedelta(days=30)).isoformat()]),
             "collected": round(sum(i["amount_paid"] for i in paid), 2),
             "failed_payments": await db.saas_invoices.count_documents({"status": {"$in": ["open", "uncollectible"]}}),

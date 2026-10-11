@@ -24,7 +24,6 @@ DEFAULT_SETTINGS = {
         "services": [
             {"key": "regular", "name": "Residential / Regular Clean", "base": 45, "per_bedroom": 12, "per_bathroom": 10, "per_living_room": 8, "min_price": 60, "requires_survey": False},
             {"key": "end_of_tenancy", "name": "End of Tenancy Clean", "base": 120, "per_bedroom": 35, "per_bathroom": 30, "per_living_room": 20, "min_price": 180, "requires_survey": False},
-            {"key": "airbnb", "name": "Airbnb Turnover Clean", "base": 55, "per_bedroom": 12, "per_bathroom": 12, "per_living_room": 8, "min_price": 70, "requires_survey": False},
             {"key": "carpet", "name": "Carpet Cleaning", "base": 40, "per_bedroom": 30, "per_bathroom": 0, "per_living_room": 35, "min_price": 70, "requires_survey": False},
             {"key": "commercial", "name": "Commercial / Office Cleaning", "base": 0, "per_bedroom": 0, "per_bathroom": 0, "per_living_room": 0, "min_price": 0, "requires_survey": True},
         ],
@@ -47,7 +46,8 @@ DEFAULT_SETTINGS = {
             {"key": "cabinets", "name": "Inside kitchen cabinets", "price": 25},
             {"key": "balcony", "name": "Balcony / patio", "price": 25},
         ],
-        "parking_surcharge": 15,
+        "short_notice": {"days": 2, "type": "percent", "value": 0},
+        "promo_codes": [],
         "service_area_prefixes": [],
     },
     "availability": {
@@ -68,6 +68,10 @@ DEFAULT_SETTINGS = {
 }
 
 
+SERVICE_DEFAULTS = {"description": "", "pricing_mode": "per_room", "fixed_price": 0, "active": True, "online_booking": True,
+                    "internal_notes": "", "extras": [], "scope_included": "", "scope_excluded": "", "preparation": ""}
+
+
 def _find(items, key):
     return next((i for i in items if i["key"] == key), None)
 
@@ -77,38 +81,65 @@ def postcode_prefix(postcode: str) -> str:
     return m.group(1).upper() if m else ""
 
 
-def compute_quote(pricing: dict, q: dict) -> dict:
+def compute_quote(pricing: dict, q: dict, public: bool = True) -> dict:
     svc = _find(pricing["services"], q.get("service"))
-    if not svc:
-        return {"status": "invalid", "total": None, "lines": [], "reasons": ["Unknown service"], "currency": "GBP"}
+    if svc:
+        svc = {**SERVICE_DEFAULTS, **svc}
+    if not svc or not svc["active"] or (public and not svc["online_booking"]):
+        return {"status": "invalid", "total": None, "lines": [], "reasons": ["Unknown or unavailable service"], "currency": "GBP"}
     result = {"service_name": svc["name"], "currency": pricing["currency"], "lines": [], "reasons": []}
     if svc.get("requires_survey"):
-        result.update(status="needs_review", total=None, reasons=["Commercial cleaning is quoted after a short site survey."])
+        result.update(status="needs_review", total=None, reasons=["This service is quoted after a short survey."])
         return result
     ptype = _find(pricing["property_types"], q.get("property_type")) or pricing["property_types"][1]
     cond = _find(pricing["conditions"], q.get("condition")) or pricing["conditions"][0]
     beds, baths, livs = int(q.get("bedrooms", 0)), int(q.get("bathrooms", 1)), int(q.get("living_rooms", 1))
-    lines = [
-        {"label": f"{svc['name']} - base", "amount": svc["base"]},
-        {"label": f"{beds} bedroom(s)", "amount": beds * svc["per_bedroom"]},
-        {"label": f"{baths} bathroom(s)", "amount": baths * svc["per_bathroom"]},
-        {"label": f"{livs} living room(s)", "amount": livs * svc["per_living_room"]},
-    ]
-    subtotal = sum(line["amount"] for line in lines)
-    adjust = round(subtotal * ptype["multiplier"] * cond["multiplier"] - subtotal, 2)
-    if adjust:
-        lines.append({"label": f"{ptype['name']} / {cond['name']} adjustment", "amount": adjust})
+    if svc["pricing_mode"] == "per_room":
+        lines = [
+            {"label": f"{svc['name']} - base", "amount": svc["base"]},
+            {"label": f"{beds} bedroom(s)", "amount": beds * svc["per_bedroom"]},
+            {"label": f"{baths} bathroom(s)", "amount": baths * svc["per_bathroom"]},
+            {"label": f"{livs} living room(s)", "amount": livs * svc["per_living_room"]},
+        ]
+        subtotal = sum(line["amount"] for line in lines)
+        adjust = round(subtotal * ptype["multiplier"] * cond["multiplier"] - subtotal, 2)
+        if adjust:
+            lines.append({"label": f"{ptype['name']} / {cond['name']} adjustment", "amount": adjust})
+    else:
+        lines = [{"label": svc["name"] + (" (starting price)" if svc["pricing_mode"] == "from" else ""), "amount": svc["fixed_price"]}]
+    allowed = svc["extras"] or [e["key"] for e in pricing["extras"]]
     for key in q.get("extras") or []:
         extra = _find(pricing["extras"], key)
-        if extra:
+        if extra and key in allowed:
             lines.append({"label": extra["name"], "amount": extra["price"]})
-    if q.get("parking") == "none" and pricing.get("parking_surcharge"):
-        lines.append({"label": "No free parking surcharge", "amount": pricing["parking_surcharge"]})
     total = round(sum(line["amount"] for line in lines), 2)
     if total < svc["min_price"]:
-        lines.append({"label": "Minimum charge top-up", "amount": round(svc["min_price"] - total, 2)})
+        lines.append({"label": "Minimum booking value top-up", "amount": round(svc["min_price"] - total, 2)})
         total = float(svc["min_price"])
+    sn = pricing.get("short_notice") or {}
+    if q.get("date") and sn.get("value"):
+        try:
+            if (date.fromisoformat(q["date"]) - now().date()).days <= sn["days"]:
+                amt = round(total * sn["value"] / 100, 2) if sn["type"] == "percent" else float(sn["value"])
+                lines.append({"label": "Short-notice surcharge", "amount": amt})
+                total = round(total + amt, 2)
+        except ValueError:
+            pass
+    code = (q.get("promo_code") or "").strip().upper()
+    if code:
+        promo = next((p for p in pricing.get("promo_codes", []) if p["code"].upper() == code and p.get("active")
+                      and (not p.get("expires") or p["expires"] >= now().date().isoformat())
+                      and (not p.get("max_uses") or p.get("uses", 0) < p["max_uses"])), None)
+        if promo:
+            off = round(total * promo["value"] / 100, 2) if promo["type"] == "percent" else min(float(promo["value"]), total)
+            lines.append({"label": f"Promo {promo['code'].upper()}", "amount": -off})
+            total = round(total - off, 2)
+            result["promo_applied"] = promo["code"].upper()
+        else:
+            result["promo_error"] = "Promo code not valid"
     reasons = []
+    if svc["pricing_mode"] == "from":
+        reasons.append("This is a starting price - our team will confirm the final price.")
     if cond.get("requires_review"):
         reasons.append("Property condition needs a quick review by our team before a fixed price.")
     if q.get("postcode") and pricing["service_area_prefixes"] and postcode_prefix(q["postcode"]) not in pricing["service_area_prefixes"]:

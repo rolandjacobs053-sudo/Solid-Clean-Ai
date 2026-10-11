@@ -2,12 +2,40 @@ import os
 from datetime import timedelta
 
 from core import db, hash_password, now, verify_password
-from pricing import DEFAULT_SETTINGS, compute_quote
+from pricing import DEFAULT_SETTINGS, SERVICE_DEFAULTS, compute_quote
+from routes_policies import policy_seed_docs
+
+SOLID_BUSINESS = {"name": "Solid Clean Ltd", "website": "https://solidcleanltd.com", "phone": "020 3728 4419", "logo_url": "/brand/solidclean-logo.png",
+                  "brand_primary": "#023F00", "brand_accent": "#8F7E22", "payment_mode": "full_upfront", "online_payments": True}
+BUSINESS_DEFAULTS = {"phone": "[Business phone]", "logo_url": "", "brand_primary": "#0F766E", "brand_accent": "#0F172A", "payment_mode": "full_upfront",
+                     "payment_instructions": "", "online_payments": True, "business_hours": "[Business hours]", "invoice_legal_name": "[Legal company name]",
+                     "invoice_address": "[Registered address]", "company_number": "[Company number]", "vat_registered": False, "vat_number": ""}
+
+
+async def migrate_company(company: dict):
+    cid = str(company["_id"])
+    s = await db.settings.find_one({"company_id": cid})
+    if s:
+        p = s["pricing"]
+        p["services"] = [{**SERVICE_DEFAULTS, **x} for x in p["services"] if "airbnb" not in x["key"].lower() and "airbnb" not in x["name"].lower()]
+        p.pop("parking_surcharge", None)
+        p.setdefault("short_notice", {"days": 2, "type": "percent", "value": 0})
+        p.setdefault("promo_codes", [])
+        biz = {**BUSINESS_DEFAULTS, **s["business"], **(SOLID_BUSINESS if company["slug"] == "solid-clean" else {})}
+        biz.pop("booking_page", None)
+        await db.settings.update_one({"_id": s["_id"]}, {"$set": {"pricing": p, "business": biz}})
+    for col in ("quotes", "bookings"):
+        await db[col].update_many({"company_id": cid, "input.service": "airbnb"}, {"$set": {"input.service": "regular", "service": "regular", "service_name": "Residential / Regular Clean", "result.service_name": "Residential / Regular Clean"}})
+        await db[col].update_many({"company_id": cid}, {"$unset": {"input.parking": ""}})
+    await db.prospects.update_many({"company_id": cid, "sector": "airbnb_management"}, {"$set": {"sector": "property_management"}})
+    await db.prospects.update_many({"company_id": cid, "company": "Kingston Stays Co (demo)"}, {"$set": {"company": "Kingston Lettings Co (demo)"}})
+    if not await db.policies.find_one({"company_id": cid}):
+        await db.policies.insert_many([{**d, "company_id": cid} for d in policy_seed_docs(company["name"])])
 
 LEADS = [
     ("Hannah Clarke", "SW19 2AB", "google_ads", "booked", "end_of_tenancy", 2, 1, 3, 2),
     ("Tom Reeves", "CR0 4LP", "seo", "completed", "regular", 3, 2, 20, -10),
-    ("Priya Shah", "KT1 3HD", "ai_chat", "quoted", "airbnb", 1, 1, 2, None),
+    ("Priya Shah", "KT1 3HD", "ai_chat", "quoted", "regular", 1, 1, 2, None),
     ("Daniel Okafor", "SM1 2QW", "google_ads", "completed", "end_of_tenancy", 3, 2, 25, -15),
     ("Lucy Fenwick", "TW9 1EJ", "website", "new", "carpet", 2, 1, 0, None),
     ("Marcus Bell", "SE22 8DN", "phone", "booked", "regular", 2, 1, 5, 4),
@@ -18,7 +46,7 @@ LEADS = [
 PROSPECTS = [
     ("Southside Lettings (demo)", "letting_agent", "Sarah Lane", "SW19", "interested"),
     ("Croydon Property Partners (demo)", "property_management", "James Doyle", "CR0", "contacted"),
-    ("Kingston Stays Co (demo)", "airbnb_management", "Mia Patel", "KT1", "to_contact"),
+    ("Kingston Lettings Co (demo)", "letting_agent", "Mia Patel", "KT1", "to_contact"),
     ("Richmond Fitness Hub (demo)", "gym", "Ben Cole", "TW9", "meeting"),
     ("Sutton Build Group (demo)", "construction", "Ray Moss", "SM1", "not_interested"),
     ("Clapham Workspace (demo)", "office", "Anna Fry", "SW4", "to_contact"),
@@ -67,7 +95,7 @@ async def seed_demo(pricing: dict):
     for name, pc, src, status, svc, beds, baths, ago, offset in LEADS:
         email = name.lower().replace(" ", ".") + "@example.com"
         q = {"service": svc, "property_type": "flat", "bedrooms": beds, "bathrooms": baths, "living_rooms": 1,
-             "condition": "good", "extras": [], "parking": "free", "postcode": pc}
+             "condition": "good", "extras": [], "postcode": pc}
         res = compute_quote(pricing, q)
         lead = {"name": name, "email": email, "phone": "07700 900" + str(100 + ago), "postcode": pc, "source": src, "status": status,
                 "type": "residential", "notes": "", "marketing_consent": False, "demo": True, "created_at": _iso(ago), "updated_at": _iso(ago),
@@ -125,3 +153,5 @@ async def seed_all():
         await db.settings.update_one({"_id": settings["_id"]}, {"$set": {"demo_seeded": True}})
     for col in ("settings", "leads", "quotes", "bookings", "conversations", "prospects", "reviews", "spend", "communications", "suppressions", "payment_transactions"):
         await db[col].update_many({"company_id": {"$exists": False}}, {"$set": {"company_id": cid}})
+    async for company in db.companies.find({}):
+        await migrate_company(company)

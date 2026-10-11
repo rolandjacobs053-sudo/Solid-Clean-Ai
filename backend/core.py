@@ -19,6 +19,7 @@ LLM_KEY = os.environ["EMERGENT_LLM_KEY"]
 LLM_MODEL = ("anthropic", "claude-sonnet-5-5")
 PAST_DUE_GRACE_DAYS = 7
 current_company: ContextVar[dict] = ContextVar("current_company")
+current_actor: ContextVar[str] = ContextVar("current_actor", default="system")
 
 
 class BaseDocument(BaseModel):
@@ -182,6 +183,7 @@ async def require_member_any(request: Request) -> dict:
     if not company:
         raise HTTPException(403, "Company not found")
     set_tenant(company)
+    current_actor.set(user["email"])
     return {"user": user, "company": company}
 
 
@@ -218,6 +220,10 @@ def feature(key: str):
         if not ctx["company"].get("comped") and key not in await plan_features(ctx["company"]):
             raise HTTPException(403, f"Your plan doesn't include {key.replace('_', ' ')} - upgrade in Billing")
     return check
+
+
+async def audit(action: str, detail: str):
+    await tdb.audit_logs.insert_one({"action": action, "detail": detail[:2000], "actor": current_actor.get(), "at": now_iso()})
 
 
 async def get_settings() -> dict:

@@ -7,8 +7,27 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { PageHeader, Panel } from "@/components/admin/ui";
-import { api, errMsg, label } from "@/lib/api";
+import { PageHeader, Panel, useLoad } from "@/components/admin/ui";
+import { RulesEditor, ServicesEditor } from "@/components/admin/PricingEditors";
+import { api, errMsg, fmtDateTime, label } from "@/lib/api";
+
+function History() {
+  const [ph] = useLoad("/admin/price-history");
+  const [log] = useLoad("/admin/audit-log");
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <Panel title="Price change history">
+        <ul className="max-h-[60vh] space-y-3 overflow-y-auto text-xs" data-testid="price-history-list">
+          {ph?.map((h) => <li key={h.id} className="rounded-lg bg-slate-50 p-3"><p className="font-mono text-slate-500">{fmtDateTime(h.at)} · {h.actor}</p>{h.changes.map((c, i) => <p key={i} className="mt-1"><span className="font-mono">{c.field.replace("pricing.", "")}</span>: <s className="text-slate-400">{JSON.stringify(c.old)}</s> → <b>{JSON.stringify(c.new)}</b></p>)}</li>)}
+          {ph?.length === 0 && <p className="text-slate-400">No price changes yet.</p>}
+        </ul>
+      </Panel>
+      <Panel title="Audit log">
+        <ul className="max-h-[60vh] divide-y overflow-y-auto text-xs" data-testid="audit-log-list">{log?.map((a) => <li key={a.id} className="flex justify-between gap-2 py-2"><span><b>{a.action}</b> {a.detail}</span><span className="whitespace-nowrap font-mono text-slate-400">{a.actor} · {fmtDateTime(a.at)}</span></li>)}</ul>
+      </Panel>
+    </div>
+  );
+}
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const num = (v) => (v === "" ? 0 : Number(v));
@@ -47,7 +66,7 @@ export default function Settings() {
   const setAv = (k, v) => setS({ ...s, availability: { ...av, [k]: v } });
   const editRow = (k) => (i, f, v) => setP(k, p[k].map((r, j) => (j === i ? { ...r, [f]: v } : r)));
   const save = async () => {
-    try { await api.put("/admin/settings", { business: s.business, pricing: p, availability: av, knowledge_base: s.knowledge_base }); toast.success("Settings saved - AI receptionist and quote engine updated"); } catch (e) { toast.error(errMsg(e)); }
+    try { await api.put("/admin/settings", { business: s.business, pricing: p, availability: av, knowledge_base: s.knowledge_base }); toast.success("Settings saved - new prices apply to new quotes and bookings; confirmed bookings keep their agreed price"); } catch (e) { toast.error(errMsg(e)); }
   };
   const clearDemo = async () => { const { data } = await api.delete("/admin/demo-data"); toast.success(`Removed ${data.removed} demo records`); };
 
@@ -58,23 +77,23 @@ export default function Settings() {
       </PageHeader>
       <Tabs defaultValue="pricing">
         <TabsList className="flex-wrap">
-          {["pricing", "availability", "knowledge", "business"].map((t) => <TabsTrigger key={t} value={t} className="capitalize" data-testid={`settings-tab-${t}`}>{t === "knowledge" ? "Knowledge base" : t}</TabsTrigger>)}
+          {["pricing", "rules", "availability", "knowledge", "business", "history"].map((t) => <TabsTrigger key={t} value={t} className="capitalize" data-testid={`settings-tab-${t}`}>{t === "knowledge" ? "Knowledge base" : t === "pricing" ? "Services & prices" : t === "rules" ? "Surcharges & promos" : t}</TabsTrigger>)}
         </TabsList>
         <TabsContent value="pricing" className="space-y-6">
           <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900" data-testid="settings-placeholder-notice">{p.placeholder_notice}</p>
-          <Panel title="Services (£)"><NumTable rows={p.services} fields={["base", "per_bedroom", "per_bathroom", "per_living_room", "min_price", "requires_survey"]} onChange={editRow("services")} testid="settings-pricing-services" /></Panel>
+          <ServicesEditor pricing={p} setP={setP} />
           <div className="grid gap-6 lg:grid-cols-2">
             <Panel title="Property type multipliers"><NumTable rows={p.property_types} fields={["multiplier"]} onChange={editRow("property_types")} testid="settings-ptypes" /></Panel>
             <Panel title="Condition multipliers"><NumTable rows={p.conditions} fields={["multiplier", "requires_review"]} onChange={editRow("conditions")} testid="settings-conditions" /></Panel>
             <Panel title="Extras (£)"><NumTable rows={p.extras} fields={["price"]} onChange={editRow("extras")} testid="settings-extras" /></Panel>
-            <Panel title="Rules">
-              <Label>No-parking surcharge (£)</Label>
-              <Input type="number" className="mt-1 w-32 font-mono" value={p.parking_surcharge} onChange={(e) => setP("parking_surcharge", num(e.target.value))} data-testid="settings-pricing-base-rate-input" />
-              <Label className="mt-4 block">Service area postcode prefixes (comma separated)</Label>
+            <Panel title="Service areas">
+              <Label className="block">Service area postcode prefixes (comma separated, empty = no restriction)</Label>
               <Input className="mt-1 font-mono" value={p.service_area_prefixes.join(", ")} onChange={(e) => setP("service_area_prefixes", list(e.target.value.toUpperCase()))} data-testid="settings-area-input" />
             </Panel>
           </div>
         </TabsContent>
+        <TabsContent value="rules"><RulesEditor pricing={p} setP={setP} /></TabsContent>
+        <TabsContent value="history"><History /></TabsContent>
         <TabsContent value="availability">
           <Panel>
             <Label>Working days</Label>
@@ -108,7 +127,9 @@ export default function Settings() {
             <div className="grid gap-4 sm:grid-cols-2">
               {Object.entries(s.business).map(([k, v]) => (
                 <div key={k}><Label className="capitalize">{label(k)}</Label>
-                  <Input className="mt-1" value={v} onChange={(e) => setS({ ...s, business: { ...s.business, [k]: typeof v === "number" ? num(e.target.value) : e.target.value } })} data-testid={`settings-business-${k}`} />
+                  {typeof v === "boolean"
+                    ? <div className="mt-2"><Switch checked={v} onCheckedChange={(x) => setS({ ...s, business: { ...s.business, [k]: x } })} data-testid={`settings-business-${k}`} /></div>
+                    : <Input className="mt-1" value={v} onChange={(e) => setS({ ...s, business: { ...s.business, [k]: typeof v === "number" ? num(e.target.value) : e.target.value } })} data-testid={`settings-business-${k}`} />}
                 </div>
               ))}
             </div>

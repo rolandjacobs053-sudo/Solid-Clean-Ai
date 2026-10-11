@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { BarChart3, Bot, CalendarDays, CreditCard, ExternalLink, LogOut, Mail, Megaphone, Search, Send, Settings, Star, UserCog, Users } from "lucide-react";
+import { BarChart3, Bot, CalendarDays, CreditCard, ExternalLink, LogOut, Mail, Megaphone, ScrollText, Search, Send, Settings, Star, UserCog, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/site/SiteHeader";
 import { fmtDate } from "@/lib/api";
@@ -8,7 +8,7 @@ const NAV = [
   ["", "Overview", BarChart3, "analytics"], ["leads", "Leads & CRM", Users, "crm"], ["bookings", "Bookings", CalendarDays, "quotes_bookings"],
   ["receptionist", "AI receptionist", Bot, "ai_receptionist"], ["growth", "SEO & Google Ads", Search, "marketing"], ["outreach", "Cold email", Send, "outreach"],
   ["reviews", "Reviews", Star, "reviews"], ["marketing", "Marketing spend", Megaphone, "analytics"], ["comms", "Communications", Mail, "crm"],
-  ["staff", "Team", UserCog, null], ["settings", "Settings", Settings, null], ["billing", "Billing", CreditCard, null],
+  ["staff", "Team", UserCog, null], ["policies", "Policies & terms", ScrollText, null], ["settings", "Settings", Settings, null], ["billing", "Billing", CreditCard, null],
 ];
 
 function Banner({ company }) {

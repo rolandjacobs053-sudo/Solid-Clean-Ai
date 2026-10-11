@@ -1,5 +1,6 @@
 import json
 import logging
+import secrets
 import os
 from datetime import timedelta, date
 from typing import List, Optional
@@ -40,8 +41,9 @@ class QuoteIn(BaseModel):
     living_rooms: int = Field(1, ge=0, le=6)
     condition: str = "good"
     extras: List[str] = []
-    parking: str = "free"
     postcode: str = ""
+    date: str = ""
+    promo_code: str = ""
 
 
 class Contact(BaseModel):
@@ -61,6 +63,7 @@ class BookingIn(QuoteSave):
     date: str
     slot: str
     access_notes: str = ""
+    accepted_policies: dict = {}
     quote_id: Optional[str] = None
     origin_url: str
 
@@ -96,7 +99,9 @@ async def public_config(slug: str):
     feats = await plan_features(company)
     return {"pricing": s["pricing"], "availability": s["availability"], "knowledge_base": s["knowledge_base"],
             "ai_receptionist": company.get("comped") or "ai_receptionist" in feats,
-            "business": {"name": s["business"]["name"], "website": s["business"].get("website"), "online_payments": s["business"].get("online_payments", True)}}
+            "policies": [{k: p.get(k) for k in ("key", "title", "published_version", "published_content", "effective_date", "require_acceptance")}
+                         async for p in tdb.policies.find({"audience": "public", "published_version": {"$gt": 0}}).sort("order", 1)],
+            "business": {k: s["business"].get(k) for k in ("name", "website", "online_payments", "phone", "logo_url", "brand_primary", "brand_accent")}}
 
 
 @public.post("/quote/preview")
@@ -144,8 +149,11 @@ async def get_quote(quote_id: str):
 @public.post("/bookings")
 async def create_booking(body: BookingIn):
     s = await get_settings()
-    q = body.quote.model_dump()
+    q = {**body.quote.model_dump(), "date": body.date}
     result = compute_quote(s["pricing"], q)
+    required = {p["key"]: p["published_version"] async for p in tdb.policies.find({"require_acceptance": True, "published_version": {"$gt": 0}})}
+    if any(body.accepted_policies.get(k) != v for k, v in required.items()):
+        raise HTTPException(409, "Please review and accept the current booking terms and policies.")
     if result["status"] != "ok":
         raise HTTPException(422, "This booking needs a quick review by our team: " + " ".join(result["reasons"]))
     if body.slot not in [x["slot"] for x in await slots_for(s["availability"], body.date)]:
@@ -163,7 +171,8 @@ async def create_booking(body: BookingIn):
     booking = {"lead_id": lead_id, "quote_id": quote_id, "customer": {k: contact[k] for k in ("name", "email", "phone")},
                "postcode": q["postcode"].upper(), "service": q["service"], "service_name": result["service_name"], "input": q,
                "total": result["total"], "date": body.date, "slot": body.slot, "access_notes": body.access_notes,
-               "status": "pending_payment", "payment_status": "pending", "source": lead["source"],
+               "status": "pending_payment", "payment_status": "pending", "source": lead["source"], "accepted_policies": required,
+               "reference": f"{current_company.get()['slug'][:2].upper()}-{now().strftime('%y%m')}-{secrets.token_hex(3).upper()}", "promo_code": result.get("promo_applied"),
                "hold_expires_at": (now() + timedelta(minutes=30)).isoformat(), "created_at": now_iso()}
     booking_id = str((await tdb.bookings.insert_one(booking)).inserted_id)
     if not s["business"].get("online_payments", True):
@@ -200,8 +209,10 @@ async def finalize_booking(booking_id: str, paid: bool = True):
         return
     b = await tdb.bookings.find_one({"_id": oid(booking_id)})
     s = await get_settings()
-    when = f"{fmt_date(b['date'])} at {b['slot']}"
+    when = f"{fmt_date(b['date'])} at {b['slot']} (ref {b.get('reference', '-')})"
     c = b["customer"]
+    if b.get("promo_code"):
+        await tdb.settings.update_one({"pricing.promo_codes.code": b["promo_code"]}, {"$inc": {"pricing.promo_codes.$.uses": 1}})
     pay_text = f"Payment of £{b['total']:.2f} received." if paid else f"Amount due: £{b['total']:.2f}. {s['business'].get('payment_instructions', '')}"
     await tdb.leads.update_one({"_id": oid(b["lead_id"])}, {"$set": {"status": "booked"}})
     await tdb.quotes.update_one({"_id": oid(b["quote_id"])}, {"$set": {"status": "accepted"}})
@@ -236,7 +247,7 @@ async def payment_status(session_id: str):
         await finalize_booking(tx["booking_id"])
     b = await tdb.bookings.find_one({"_id": oid(tx["booking_id"])})
     return {"session_id": session_id, "status": tx["status"], "payment_status": tx["payment_status"],
-            "booking": {"service_name": b["service_name"], "date": b["date"], "slot": b["slot"], "total": b["total"]}}
+            "booking": {"service_name": b["service_name"], "date": b["date"], "slot": b["slot"], "total": b["total"], "reference": b.get("reference")}}
 
 
 @router.post("/stripe/webhook")

@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/admin", dependencies=[Depends(require_admin)])
 outreach = APIRouter(prefix="/api/admin", dependencies=[Depends(feature("outreach"))])
 reviews_r = APIRouter(prefix="/api/admin", dependencies=[Depends(feature("reviews"))])
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-SECTORS = ["letting_agent", "estate_agent", "property_management", "landlord", "airbnb_management", "office", "gym", "construction"]
+SECTORS = ["letting_agent", "estate_agent", "property_management", "landlord", "office", "gym", "construction"]
 CONSENT_SECTORS = {"landlord"}
 REPLY_STATUS = {"interested": "interested", "not_interested": "not_interested", "question": "replied",
                 "out_of_office": "contacted", "unsubscribe": "opted_out"}

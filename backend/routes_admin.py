@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from ai import ai_complete
 from automations import run_automations
 from comms import add_event, log_comm
-from core import company_name, days_ago_iso, get_settings, now, now_iso, oid, out, outs, require_admin, tdb
+from core import audit, company_name, current_actor, days_ago_iso, get_settings, now, now_iso, oid, out, outs, require_admin, require_owner, tdb
 from pricing import fmt_date
 
 router = APIRouter(prefix="/api/admin", dependencies=[Depends(require_admin)])
@@ -162,6 +162,7 @@ async def patch_booking(booking_id: str, body: BookingPatch):
     if body.status not in ("completed", "cancelled", "confirmed"):
         raise HTTPException(400, "Invalid status")
     await tdb.bookings.update_one({"_id": b["_id"]}, {"$set": {"status": body.status, "updated_at": now_iso()}})
+    await audit("booking.status", f"{b.get('reference') or b['_id']} -> {body.status}")
     c, s = b["customer"], await get_settings()
     when = f"{fmt_date(b['date'])} {b['slot']}"
     if body.status == "completed":
@@ -233,10 +234,35 @@ async def read_settings():
     return await get_settings()
 
 
-@router.put("/settings")
+def _diff(a, b, path):
+    if isinstance(a, dict) and isinstance(b, dict):
+        return [c for k in sorted(set(a) | set(b)) for c in _diff(a.get(k), b.get(k), f"{path}.{k}")]
+    if isinstance(a, list) and isinstance(b, list) and a + b and all(isinstance(x, dict) and "key" in x for x in a + b):
+        am, bm = {x["key"]: x for x in a}, {x["key"]: x for x in b}
+        return [c for k in sorted(set(am) | set(bm)) for c in _diff(am.get(k), bm.get(k), f"{path}[{k}]")]
+    return [] if a == b else [{"field": path, "old": a, "new": b}]
+
+
+@router.put("/settings", dependencies=[Depends(require_owner)])
 async def write_settings(body: SettingsIn):
-    await tdb.settings.update_one({"key": "main"}, {"$set": body.model_dump()})
-    return {"ok": True}
+    old = await get_settings()
+    changes = _diff(old.get("pricing", {}), body.pricing, "pricing")
+    if changes:
+        await tdb.price_history.insert_one({"at": now_iso(), "actor": current_actor.get(), "changes": changes[:300]})
+    await tdb.settings.update_one({}, {"$set": body.model_dump()})
+    await audit("settings.update", f"{len(changes)} pricing change(s)")
+    return {"ok": True, "pricing_changes": len(changes)}
+
+
+@router.get("/price-history")
+async def price_history():
+    return outs(await tdb.price_history.find({}).sort("at", -1).to_list(100))
+
+
+@router.get("/audit-log", dependencies=[Depends(require_owner)])
+async def audit_log():
+    return outs(await tdb.audit_logs.find({}).sort("at", -1).to_list(300))
+
 
 
 @router.delete("/demo-data")

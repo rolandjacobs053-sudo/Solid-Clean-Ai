@@ -15,7 +15,7 @@ import { QuoteSummary } from "@/components/quote/QuoteSummary";
 import { SlotPicker } from "@/components/quote/SlotPicker";
 
 const STEPS = ["Property", "Rooms & extras", "Date & time", "Your details"];
-const INITIAL = { service: "regular", property_type: "flat", bedrooms: 2, bathrooms: 1, living_rooms: 1, condition: "good", extras: [], parking: "free", postcode: "" };
+const INITIAL = { service: "regular", property_type: "flat", bedrooms: 2, bathrooms: 1, living_rooms: 1, condition: "good", extras: [], postcode: "", promo_code: "" };
 
 export default function QuotePage() {
   const { base, pub } = useTenant();
@@ -30,6 +30,7 @@ export default function QuotePage() {
   const [contact, setContact] = useState({ name: "", email: "", phone: "", marketing_consent: false });
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  const [accepted, setAccepted] = useState({});
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
@@ -39,12 +40,15 @@ export default function QuotePage() {
   }, [params, pub]);
 
   useEffect(() => {
-    const t = setTimeout(() => api.post(`${pub}/quote/preview`, form).then((r) => setPreview(r.data)).catch(() => {}), 250);
+    const body = { ...form, date: date ? format(date, "yyyy-MM-dd") : "" };
+    const t = setTimeout(() => api.post(`${pub}/quote/preview`, body).then((r) => setPreview(r.data)).catch(() => {}), 250);
     return () => clearTimeout(t);
-  }, [form, pub]);
+  }, [form, pub, date]);
 
   if (!config) return <div className="p-16 text-center font-mono text-sm text-slate-500">Loading price list…</div>;
-  const p = config.pricing;
+  const p = { ...config.pricing, services: config.pricing.services.filter((s) => s.active !== false && s.online_booking !== false) };
+  const required = (config.policies || []).filter((x) => x.require_acceptance);
+  const termsOk = required.every((x) => accepted[x.key]);
   const needsReview = preview?.status === "needs_review";
   const postcodeOk = /^[A-Za-z]{1,2}\d/.test(form.postcode.trim());
   const canNext = [postcodeOk, true, needsReview || (date && slot), true][step];
@@ -52,10 +56,12 @@ export default function QuotePage() {
 
   const submit = async (mode) => {
     if (!contactOk) return toast.error("Please add your name, a valid email and phone number.");
+    if (mode === "book" && !termsOk) return toast.error("Please review and accept the booking terms.");
     setBusy(true);
     try {
       if (mode === "book") {
-        const { data } = await api.post(`${pub}/bookings`, { quote: form, contact, date: format(date, "yyyy-MM-dd"), slot, access_notes: notes, source: getSource(), quote_id: quoteId, origin_url: `${window.location.origin}${base}` });
+        const accepted_policies = Object.fromEntries(required.map((x) => [x.key, x.published_version]));
+        const { data } = await api.post(`${pub}/bookings`, { quote: form, contact, date: format(date, "yyyy-MM-dd"), slot, access_notes: notes, source: getSource(), quote_id: quoteId, accepted_policies, origin_url: `${window.location.origin}${base}` });
         if (data.confirmed) {
           toast.success(`Booking confirmed. ${data.payment_instructions || ""}`, { duration: 10000 });
           setBusy(false);
@@ -129,14 +135,6 @@ export default function QuotePage() {
                   ))}
                 </div>
               </div>
-              <div>
-                <Label className="eyebrow">Parking</Label>
-                <div className="mt-3 grid grid-cols-3 gap-3">
-                  {[["free", "Free parking"], ["paid", "Paid / permit"], ["none", "No parking nearby"]].map(([k, t]) => (
-                    <ChoiceCard key={k} active={form.parking === k} onClick={() => set("parking", k)} title={t} testid={`quote-parking-${k}`} />
-                  ))}
-                </div>
-              </div>
             </>
           )}
           {step === 2 && (needsReview
@@ -158,13 +156,25 @@ export default function QuotePage() {
                 <Checkbox checked={contact.marketing_consent} onCheckedChange={(c) => setContact({ ...contact, marketing_consent: !!c })} data-testid="quote-marketing-consent-checkbox" />
                 I'd like occasional offers and cleaning tips by email. (Optional - you can unsubscribe at any time.)
               </label>
+              <div className="sm:col-span-2">
+                <Label htmlFor="promo">Promo code (optional)</Label>
+                <Input id="promo" value={form.promo_code} onChange={(e) => set("promo_code", e.target.value.toUpperCase())} className="mt-2 h-11 max-w-xs rounded-xl font-mono" data-testid="quote-promo-input" />
+                {preview?.promo_error && form.promo_code && <p className="mt-1 text-xs text-red-600" data-testid="quote-promo-error">{preview.promo_error}</p>}
+              </div>
+              {!needsReview && required.map((x) => (
+                <label key={x.key} className="flex items-start gap-3 text-sm text-slate-700 sm:col-span-2">
+                  <Checkbox checked={!!accepted[x.key]} onCheckedChange={(c) => setAccepted({ ...accepted, [x.key]: !!c })} data-testid={`quote-accept-${x.key}`} />
+                  <span>I have read and accept the <a href={`${base}/policies#${x.key}`} target="_blank" rel="noreferrer" className="font-medium text-teal-700 underline">{x.title}</a> (version {x.published_version}).</span>
+                </label>
+              ))}
+              <p className="text-xs text-slate-500 sm:col-span-2">All policies: <a href={`${base}/policies`} target="_blank" rel="noreferrer" className="underline" data-testid="quote-policies-link">view company policies</a></p>
             </div>
           )}
           <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-6">
             {step > 0 && <Button variant="ghost" onClick={() => setStep(step - 1)} data-testid="quote-back-btn"><ArrowLeft className="mr-1 h-4 w-4" />Back</Button>}
             {step < 3 && <Button disabled={!canNext} onClick={() => setStep(step + 1)} className="rounded-full bg-slate-900 px-7 hover:bg-teal-700 hover:text-white" data-testid="quote-next-btn">Continue<ArrowRight className="ml-1 h-4 w-4" /></Button>}
             {step === 3 && !needsReview && (
-              <Button disabled={busy} onClick={() => submit("book")} className="rounded-full bg-teal-600 px-7 hover:bg-teal-700 hover:text-white" data-testid="quote-book-now-btn">
+              <Button disabled={busy || !termsOk} onClick={() => submit("book")} className="rounded-full bg-teal-600 px-7 hover:bg-teal-700 hover:text-white" data-testid="quote-book-now-btn">
                 {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Pay {gbp(preview?.total)} &amp; confirm
               </Button>
             )}
