@@ -1,0 +1,100 @@
+{
+  "project_name": "Solid Clean Ltd - AI Powered Cleaning Operating System & Booking Engine",
+  "theme": "Light theme for public booking site (Immaculate Crisp Porcelain & Teal/Emerald accent) + Dark/Hybrid option for Admin CRM Command Center",
+  "archetype": "Swiss High-Contrast & Organic Precision (Archetype 1 + Archetype 4)",
+  "typography": {
+    "font_family_heading": "Outfit, sans-serif",
+    "font_family_body": "DM Sans, sans-serif",
+    "font_family_mono": "JetBrains Mono, monospace",
+    "google_fonts_import": "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap",
+    "scale": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.1]",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight",
+      "h3": "text-xl sm:text-2xl font-semibold tracking-tight",
+      "h4": "text-lg sm:text-xl font-medium",
+      "eyebrow": "font-mono text-xs uppercase tracking-[0.2em] font-semibold text-teal-700 dark:text-teal-400",
+      "body": "text-base leading-relaxed text-slate-600 dark:text-slate-300",
+      "small": "text-xs sm:text-sm text-slate-500 dark:text-slate-400"
+    }
+  },
+  "colors": {
+    "primary": {
+      "default": "#0D9488",
+      "hover": "#0F766E",
+      "light": "#CCFBF1",
+      "dark": "#115E59"
+    },
+    "secondary": {
+      "default": "#0F172A",
+      "hover": "#1E293B",
+      "foreground": "#F8FAFC"
+    },
+    "accent": {
+      "gold": "#F59E0B",
+      "emerald": "#10B981",
+      "sky": "#0EA5E9"
+    },
+    "background": {
+      "light": "#FAFAFC",
+      "card_light": "#FFFFFF",
+      "dark": "#0B0F19",
+      "card_dark": "#161E2E"
+    },
+    "borders": {
+      "light": "rgba(226, 232, 240, 0.8)",
+      "dark": "rgba(51, 65, 85, 0.6)"
+    }
+  },
+  "spacing_and_layout": {
+    "philosophy": "Generous Spacing (2-3x normal scale). Prevent text collisions with internal container padding p-6 or p-8.",
+    "bento_grid_mode": "Tetris Grid for marketing/quote benefits; High Density Grid (4-column) for Admin CRM & analytics dashboard.",
+    "container_max_width": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+  },
+  "component_strategies": {
+    "public_booking_flow": "Multi-step interactive quote calculator with live price ticker, property type cards (Domestic, End of Tenancy, Commercial Office, Airbnb, Deep Clean), room counter steppers, extra services checkboxes (carpet steam, oven, windows), slot calendar picker, customer details, and mock Stripe Checkout page.",
+    "ai_receptionist_chat": "Floating bottom-right collapsible widget. Shows greeting, answers South London & Surrey FAQs, collects property details in chat, renders live instant quote summary card in chat thread, captures phone/email, and allows human escalation request.",
+    "admin_crm_dashboard": "Sidebar layout with header KPI cards (New Leads, Quotes Awaiting, Upcoming Jobs, Revenue, Ad Spend, Cost Per Lead, CAC, Conversion Rate), Channel Profitability Table, Interactive Leads Pipeline with Detail Drawer, Job Management with Review Trigger, AI Call/Chat Summaries log, Commercial Outreach list, Review Response Approval queue, Marketing Spend entry form, Settings (Pricing rules & FAQ editor), Communications Log, and long-form written Proposal document.",
+    "written_proposal_page": "High-craft long-form document answering the 12 key system questions (architecture, Airtable/Make reuse, costs breakdown table, phased timeline, ownership, automated testing strategy) with copy-to-clipboard and print/export styling."
+  },
+  "image_urls": {
+    "hero_office": "https://images.unsplash.com/photo-1781888696976-5b80e29d5040?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzN8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBjb21tZXJjaWFsJTIwY2xlYW5pbmclMjB0ZWFtJTIwY2xlYW4lMjBtb2Rlcm4lMjBvZmZpY2UlMjBob21lfGVufDB8fHx8MTc5MTY5ODIwNXww&ixlib=rb-4.1.0&q=85",
+    "living_room": "https://images.unsplash.com/photo-1564078516393-cf04bd966897?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2OTV8MHwxfHNlYXJjaHwxfHxjbGVhbiUyMGxpdmluZyUyMHJvb20lMjBpbnRlcmlvciUyMGx1eHVyeSUyMGhvdXNlfGVufDB8fHx8MTc5MTY5ODIxMnww&ixlib=rb-4.1.0&q=85",
+    "modern_kitchen": "https://images.unsplash.com/photo-1639173925921-5d5fd027713c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzN8MHwxfHNlYXJjaHw0fHxjbGVhbiUyMGtpdGNoZW4lMjBpbnRlcmlvciUyMHdoaXRlJTIwaG9tZXxlbnwwfHx8fDE3OTE2OTgyMTJ8MA&ixlib=rb-4.1.0&q=85",
+    "commercial_workspace": "https://images.unsplash.com/photo-1662261896193-b4f8a02a9773?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzN8MHwxfHNlYXJjaHw0fHxwcm9mZXNzaW9uYWwlMjBjb21tZXJjaWFsJTIwY2xlYW5pbmclMjB0ZWFtJTIwY2xlYW4lMjBtb2Rlcm4lMjBvZmZpY2UlMjBob21lfGVufDB8fHx8MTc5MTY5ODIwNXww&ixlib=rb-4.1.0&q=85"
+  },
+  "testing_and_data_attributes": {
+    "mandatory_rule": "Every single interactive button, form input, navigation item, status card, metric tile, filter select, and modal trigger MUST include a data-testid attribute formatted in kebab-case.",
+    "key_test_ids": [
+      "nav-instant-quote-btn",
+      "nav-admin-dashboard-link",
+      "nav-proposal-link",
+      "quote-property-type-select",
+      "quote-bedrooms-count",
+      "quote-bathrooms-count",
+      "quote-postcode-input",
+      "quote-calculated-price-display",
+      "quote-book-now-btn",
+      "stripe-pay-button",
+      "ai-chat-toggle-btn",
+      "ai-chat-input",
+      "ai-chat-send-btn",
+      "ai-chat-escalate-btn",
+      "admin-login-email-input",
+      "admin-login-password-input",
+      "admin-login-submit-btn",
+      "crm-kpi-new-leads",
+      "crm-kpi-revenue",
+      "crm-lead-row",
+      "crm-review-approve-btn",
+      "settings-pricing-base-rate-input"
+    ]
+  },
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "Ensure explicit text colors on hover states (e.g. hover:bg-teal-700 hover:text-white).",
+    "Use backdrop-blur-xl on sticky headers and floating glass cards.",
+    "Never use generic centered layouts for complex forms; use 2-column split (inputs on left, live price sticky summary card on right).",
+    "Include high-contrast badges for booking statuses (Pending, Confirmed, Completed, Escalated).",
+    "Provide clear feedback via Sonner toasts when updating settings, creating bookings, or sending review requests.",
+    "All mock data must reflect realistic South London & Surrey postcodes (e.g. SW19, CR0, SM1, KT1, TW9) and letting agent commercial leads."
+  ]
+}
