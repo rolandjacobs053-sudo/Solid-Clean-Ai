@@ -1,11 +1,11 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { BarChart3, Bot, Building2, CalendarDays, CalendarRange, CreditCard, ExternalLink, LogOut, Mail, Megaphone, Repeat, ScrollText, Search, Send, Settings, Sparkles, Star, UserCog, Users } from "lucide-react";
+import { BarChart3, Bot, BrainCircuit, PoundSterling, Building2, CalendarDays, CalendarRange, CreditCard, ExternalLink, LogOut, Mail, Megaphone, Repeat, ScrollText, Search, Send, Settings, Sparkles, Star, UserCog, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { InstallApp } from "@/components/admin/InstallApp";
 import { fmtDate } from "@/lib/api";
 
 const NAV = [
-  ["", "Overview", BarChart3, "analytics"], ["leads", "Leads & CRM", Users, "crm"], ["bookings", "Bookings", CalendarDays, "quotes_bookings"], ["schedule", "Staff schedule", CalendarRange, "quotes_bookings"], ["walkthroughs", "Site walkthroughs", Building2, "crm"], ["carpet-quotes", "Carpet quotes", Sparkles, "crm"], ["regular-clients", "Regular clients", Repeat, "quotes_bookings"],
+  ["", "Overview", BarChart3, "analytics"], ["business-manager", "AI Business Manager", BrainCircuit, "owner"], ["finance", "Expenses & profit", PoundSterling, "owner"], ["leads", "Leads & CRM", Users, "crm"], ["bookings", "Bookings", CalendarDays, "quotes_bookings"], ["schedule", "Staff schedule", CalendarRange, "quotes_bookings"], ["walkthroughs", "Site walkthroughs", Building2, "crm"], ["carpet-quotes", "Carpet quotes", Sparkles, "crm"], ["regular-clients", "Regular clients", Repeat, "quotes_bookings"],
   ["receptionist", "AI receptionist", Bot, "ai_receptionist"], ["growth", "SEO & Google Ads", Search, "marketing"], ["outreach", "Cold email", Send, "outreach"],
   ["reviews", "Reviews", Star, "reviews"], ["marketing", "Marketing spend", Megaphone, "analytics"], ["comms", "Communications", Mail, "crm"],
   ["staff", "Team", UserCog, null], ["policies", "Policies & terms", ScrollText, null], ["settings", "Settings", Settings, null], ["billing", "Billing", CreditCard, null],
@@ -21,7 +21,7 @@ function Banner({ company }) {
 export default function AdminLayout() {
   const { user, logout } = useAuth();
   const c = user.company;
-  const allowed = ([to, , , f]) => (user.role === "staff" ? ["bookings", "schedule", "policies"].includes(to) : !f || c.comped || c.features.includes(f));
+  const allowed = ([to, , , f]) => (user.role === "staff" ? ["bookings", "schedule", "policies"].includes(to) : f === "owner" ? user.role === "owner" : !f || c.comped || c.features.includes(f));
   const link = ({ isActive }) => `flex items-center gap-3 whitespace-nowrap rounded-xl px-3 py-2 text-sm transition-colors ${isActive ? "bg-[#8F7E22] text-white" : "text-white/70 hover:bg-white/10 hover:text-white"}`;
   return (
     <div className="min-h-screen bg-[#f6f7f9]" data-testid="admin-layout">

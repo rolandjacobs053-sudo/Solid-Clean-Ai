@@ -49,6 +49,8 @@ import CarpetRequest from "@/pages/site/CarpetRequest";
 import CarpetQuoteView from "@/pages/site/CarpetQuoteView";
 import { AboutPage, AreasPage, ContactPage, FaqPage, HomePage, PolicyPage, ReviewsPage, ServiceDetail, ServicesPage } from "@/pages/site/SitePages";
 import Policies from "@/pages/admin/Policies";
+import BusinessManager from "@/pages/admin/BusinessManager";
+import Finance from "@/pages/admin/Finance";
 import PublicPolicies from "@/pages/PublicPolicies";
 
 function BookingLayout() {
@@ -147,6 +149,8 @@ function App() {
               <Route path="walkthroughs" element={<Walkthroughs />} />
               <Route path="carpet-quotes" element={<CarpetQuotes />} />
               <Route path="regular-clients" element={<RegularClients />} />
+              <Route path="business-manager" element={<BusinessManager />} />
+              <Route path="finance" element={<Finance />} />
               <Route path="receptionist" element={<Conversations />} />
               <Route path="outreach" element={<Outreach />} />
               <Route path="reviews" element={<Reviews />} />

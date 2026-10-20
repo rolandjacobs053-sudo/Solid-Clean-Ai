@@ -1,3 +1,17 @@
 .App {
     min-height: 100vh;
 }
+
+.md-body { font-size: 0.9rem; line-height: 1.6; }
+.md-body > * + * { margin-top: 0.6rem; }
+.md-body h1, .md-body h2, .md-body h3, .md-body h4 { font-weight: 700; color: #0f172a; margin-top: 0.9rem; }
+.md-body h1 { font-size: 1.15rem; } .md-body h2 { font-size: 1.05rem; } .md-body h3, .md-body h4 { font-size: 0.95rem; }
+.md-body ul { list-style: disc; padding-left: 1.25rem; } .md-body ol { list-style: decimal; padding-left: 1.25rem; }
+.md-body li + li { margin-top: 0.25rem; }
+.md-body strong { font-weight: 700; color: #0f172a; }
+.md-body table { display: block; overflow-x: auto; border-collapse: collapse; font-size: 0.8rem; }
+.md-body th, .md-body td { border: 1px solid #e2e8f0; padding: 0.35rem 0.6rem; text-align: left; vertical-align: top; }
+.md-body th { background: #f8fafc; font-weight: 600; }
+.md-body code { background: #f1f5f9; border-radius: 4px; padding: 0 4px; font-size: 0.8rem; }
+.md-body blockquote { border-left: 3px solid #8F7E22; padding-left: 0.75rem; color: #475569; }
+
