@@ -80,7 +80,7 @@ const Qty = ({ x, n, setN }) => (
     <button type="button" className="h-7 w-7 rounded-full border border-slate-300 font-bold text-[#023F00] disabled:opacity-40" disabled={n <= 1} onClick={() => setN(n - 1)} data-testid={`quote-extra-qty-minus-${x.key}`}>−</button>
     <span className="min-w-[2.5rem] text-center font-mono text-sm" data-testid={`quote-extra-qty-value-${x.key}`}>{n}</span>
     <button type="button" className="h-7 w-7 rounded-full border border-slate-300 font-bold text-[#023F00] disabled:opacity-40" disabled={n >= (x.max_qty || 20)} onClick={() => setN(n + 1)} data-testid={`quote-extra-qty-plus-${x.key}`}>+</button>
-    <span className="text-xs text-slate-500">× {x.unit || "item"}</span>
+    <span className="whitespace-nowrap text-xs text-slate-500">× {x.unit || "item"}</span>
   </span>
 );
 

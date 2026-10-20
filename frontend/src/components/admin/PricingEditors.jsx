@@ -75,10 +75,13 @@ export function ServicesEditor({ pricing, setP }) {
 export function ExtrasEditor({ pricing, setP }) {
   const rows = pricing.extras;
   const set = (i, k, v) => setP("extras", rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
-  const add = () => setP("extras", [...rows, { key: `extra_${Date.now().toString(36)}`, name: "New extra", price: 0 }]);
+  const withKey = (svcs, key, on) => svcs.map((s) => (s.extras?.length ? { ...s, extras: on ? [...s.extras, key] : s.extras.filter((k) => k !== key) } : s));
+  const add = () => { const key = `extra_${Date.now().toString(36)}`; setP("extras", [...rows, { key, name: "New extra", price: 0 }]); setP("services", withKey(pricing.services, key, true)); };
+  const remove = (r) => { setP("extras", rows.filter((x) => x.key !== r.key)); setP("services", withKey(pricing.services, r.key, false)); };
   return (
     <Panel title="Extras (£) - shown on the booking form">
       <div className="space-y-2" data-testid="settings-extras">
+        <div className="hidden grid-cols-12 gap-2 font-mono text-[10px] uppercase tracking-wider text-slate-500 sm:grid"><span className="col-span-4">Name</span><span className="col-span-2">Price £</span><span className="col-span-2">Pricing</span><span className="col-span-2">Unit</span><span className="col-span-1">Max</span></div>
         {rows.map((r, i) => (
           <div key={r.key} className="grid grid-cols-12 items-center gap-2 border-t border-slate-100 pt-2">
             <Input className="col-span-12 sm:col-span-4" value={r.name} onChange={(e) => set(i, "name", e.target.value)} data-testid={`settings-extras-${r.key}-name`} />
@@ -86,9 +89,9 @@ export function ExtrasEditor({ pricing, setP }) {
             <label className="col-span-4 flex items-center gap-1.5 text-xs sm:col-span-2"><Switch checked={!!r.per_item} onCheckedChange={(v) => set(i, "per_item", v)} data-testid={`settings-extras-${r.key}-per-item`} />Per item</label>
             {r.per_item ? <>
               <Input className="col-span-3 sm:col-span-2" placeholder="unit e.g. blind" value={r.unit || ""} onChange={(e) => set(i, "unit", e.target.value)} data-testid={`settings-extras-${r.key}-unit`} />
-              <Input className="col-span-2 font-mono sm:col-span-1" type="number" min="1" title="Max quantity" value={r.max_qty || 20} onChange={(e) => set(i, "max_qty", Number(e.target.value || 1))} />
+              <Input className="col-span-2 font-mono sm:col-span-1" type="number" min="1" title="Max quantity" value={r.max_qty || 20} onChange={(e) => set(i, "max_qty", Number(e.target.value || 1))} data-testid={`settings-extras-${r.key}-max-qty`} />
             </> : <span className="col-span-5 sm:col-span-3" />}
-            <Button size="icon" variant="ghost" className="col-span-12 justify-self-end sm:col-span-1" onClick={() => setP("extras", rows.filter((_, j) => j !== i))} data-testid={`settings-extras-${r.key}-remove`}><Trash2 className="h-4 w-4" /></Button>
+            <Button size="icon" variant="ghost" className="col-span-12 justify-self-end sm:col-span-1" onClick={() => remove(r)} data-testid={`settings-extras-${r.key}-remove`}><Trash2 className="h-4 w-4" /></Button>
           </div>
         ))}
         <Button size="sm" variant="outline" onClick={add} data-testid="settings-extras-add"><Plus className="mr-1 h-4 w-4" />Add extra</Button>

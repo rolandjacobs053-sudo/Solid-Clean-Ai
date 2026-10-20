@@ -62,7 +62,7 @@ export default function Settings() {
   useEffect(() => { api.get("/admin/settings").then((r) => setS(r.data)); }, []);
   if (!s) return <p className="font-mono text-sm">Loading…</p>;
   const p = s.pricing, av = s.availability;
-  const setP = (k, v) => setS({ ...s, pricing: { ...p, [k]: v } });
+  const setP = (k, v) => setS((cur) => ({ ...cur, pricing: { ...cur.pricing, [k]: v } }));
   const setAv = (k, v) => setS({ ...s, availability: { ...av, [k]: v } });
   const editRow = (k) => (i, f, v) => setP(k, p[k].map((r, j) => (j === i ? { ...r, [f]: v } : r)));
   const save = async () => {

@@ -122,8 +122,13 @@ def compute_quote(pricing: dict, q: dict, public: bool = True) -> dict:
     for key in chosen:
         if key not in excluded:
             extra = _find(pricing["extras"], key)
-            n = max(1, min(int(qtys.get(key) or 1), int(extra.get("max_qty") or 20))) if extra.get("per_item") else 1
-            lines.append({"label": extra["name"] + (f" × {n}" if extra.get("per_item") else ""), "amount": round(extra["price"] * n, 2)})
+            price = max(float(extra.get("price") or 0), 0)
+            try:
+                cap = max(int(extra.get("max_qty") or 20), 1)
+            except (TypeError, ValueError):
+                cap = 20
+            n = max(1, min(int(qtys.get(key) or 1), cap)) if extra.get("per_item") else 1
+            lines.append({"label": extra["name"] + (f" × {n}" if extra.get("per_item") else ""), "amount": round(price * n, 2)})
     total = round(sum(line["amount"] for line in lines), 2)
     if total < svc["min_price"]:
         lines.append({"label": "Minimum booking value top-up", "amount": round(svc["min_price"] - total, 2)})

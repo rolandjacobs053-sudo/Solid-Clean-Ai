@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 10: tested per-item extras pricing (backend + booking form), booking lines with quantities through to Stripe, the Settings Extras editor (edit, save, check booking form, restore), before/after job photos, Send results, and the public results page incl. security. Backend: new suite test_iter10_extras_results.py passes 12/12. Regression: iter8 + iter9 suites pass. test_booking_photos_deposit.py has 7 known out-of-date failures (it still expects 50% deposit and the old blinds £20 / windows £30 prices, and it shares pytest.<attr> state between tests). Frontend: all requested flows work on desktop 1920 and mobile 390. The example quote comes to £219, +/- buttons never untick the extra, the running total updates live, changing service resets extras, and Stripe checkout showed £224 (219 + £5 tip). The results page shows Before/After with images loading, a wrong or missing token shows results-invalid, and there is no horizontal overflow at 390. The job_results email logged with status 'failed' because Resend returned 429 rate-limited (not a bug); the UI correctly showed the warning toast plus the copyable link.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/admin/settings", "issue": "pricing is an untyped Dict. Extras price/max_qty are not validated: a negative price, or a non-numeric max_qty saved via the API, would give negative lines, or a 500 in compute_quote from int('abc'). The UI always sends numbers, so this is low risk."},
+      {"endpoint": "POST /api/admin/bookings/{id}/results/send", "issue": "The results URL is built from the x-forwarded-host/host request header. Prefer a configured public site URL (e.g. the company's domain) so the link always points to the customer-facing domain."},
+      {"endpoint": "GET /api/admin/bookings/{id}/photos", "issue": "Capped at to_list(50) while the public results endpoint caps at 60, and uploads have no per-booking cap. With many photos the admin list is cut off silently."},
+      {"endpoint": "job photos", "issue": "There is no endpoint/UI to delete a wrongly uploaded before/after photo, and the results token never expires and can't be revoked."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/quote Extras step", "issues": ["Per-item cards: the '× mattress' unit label wraps onto 2 lines next to the qty buttons, and the '£30.00 per mattress' text crowds the right edge of the card on desktop", "Per-unit price text is 10px slate-400: low contrast and small"]},
+      {"screen": "/admin/settings Extras panel", "issues": ["No column headers (Name / Price £ / Unit / Max qty); the max qty input has only a title tooltip and no data-testid", "Removing an extra leaves its key in each service's extras list. A newly added extra is NOT shown on the booking form until it is ticked in the service cards (regular/EOT use explicit lists). Consider auto-ticking new extras"]},
+      {"screen": "Admin booking detail sheet / Settings", "issues": ["The sonner toast (top-right) covers the sheet's close X and the 'Save settings' button for a few seconds"]},
+      {"screen": "/results page", "issues": ["Consider adding a noindex meta tag and a lightbox; images currently open in a new tab"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter10_extras_results.py", "/app/test_reports/pytest/pytest_iter10.xml"],
+  "action_items": [
+    "Optional: validate pricing.extras (price >= 0, max_qty int 1..100, per_item bool) in PUT /api/admin/settings",
+    "Optional: auto-add newly created extras to services' extras lists, or make it clear in the UI; add column headers and a data-testid to the max qty input",
+    "Optional: add delete for job photos; build the results URL from configured site URL",
+    "Update the stale tests/test_booking_photos_deposit.py (full payment instead of 50% deposit, new blinds/windows prices)"
+  ],
+  "critical_code_review_comments": [
+    "pricing.compute_quote: clamping (1..max_qty) and per_item handling are correct. Flat extras ignore qty. Multipliers apply only to the room subtotal, not to extras (the expected behaviour per the spec)",
+    "routes_photos: results/results_photo correctly restrict to kind before/after, matching booking_id and a valid token (compare_digest). Staff scoping via _check_booking is correct, and send is owner only (verified 403 staff / 401 anon)",
+    "StepExtras: the extra_qty for a key is kept after unticking, so re-ticking restores the previous qty (harmless, since the backend ignores qty for extras that aren't chosen)"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter10_extras_results.py"],
+  "success_rate": {"backend": "100% (12/12 new; iter8/iter9 regression pass)", "frontend": "100%"},
+  "seed_data_creation": "Temporary TEST_ bookings (Mongo + UI Stripe flow), job photos and a staff user were created, then all deleted (bookings, leads, quotes, photos, payment_transactions, communications, staff). Blinds price changed 8->9 and restored to 8 via the UI (2 price_history entries remain as an audit trail). Uploaded objects in object storage are not removed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run with: REACT_APP_BACKEND_URL=... pytest backend/tests/test_iter10_extras_results.py -n 0 (pytest.ini enables xdist, and cross-class pytest.res state needs -n 0). Resend is often rate-limited (429), so email_status 'failed' is expected. Booking form testids: quote-next-btn, quote-contact-{name|email|phone}-input, quote-address-input, quote-postcode-input, quote-slot-HHMM, access-customer_present, quote-accept-*, tip-option-*, quote-pay-terms-checkbox, quote-book-now-btn."
+}

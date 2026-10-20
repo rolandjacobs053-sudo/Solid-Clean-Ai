@@ -25,9 +25,12 @@ export function AuthImg({ id, className }) {
   return <a href={src} target="_blank" rel="noreferrer"><img src={src} alt="Customer upload" className={`object-cover ${className}`} data-testid="admin-photo-img" /></a>;
 }
 
-export const PhotoGrid = ({ photos }) => (
+export const PhotoGrid = ({ photos, onDelete }) => (
   photos?.length
-    ? <div className="grid grid-cols-3 gap-2" data-testid="admin-photo-grid">{photos.map((p) => <AuthImg key={p.id} id={p.id} className="aspect-square w-full rounded-xl" />)}</div>
+    ? <div className="grid grid-cols-3 gap-2" data-testid="admin-photo-grid">{photos.map((p) => (
+      <div key={p.id} className="relative"><AuthImg id={p.id} className="aspect-square w-full rounded-xl" />
+        {onDelete && <button type="button" onClick={() => onDelete(p.id)} className="absolute right-1 top-1 h-6 w-6 rounded-full bg-black/60 text-xs text-white hover:bg-red-600" aria-label="Delete photo" data-testid={`photo-delete-${p.id}`}>×</button>}</div>
+    ))}</div>
     : <p className="text-sm text-slate-400" data-testid="admin-no-photos">No photos uploaded.</p>
 );
 
@@ -69,7 +72,7 @@ function JobPhotos({ b, photos, reload }) {
   };
   return <>{["before", "after"].map((kind) => (
     <Sec key={kind} title={`${kind} photos (team)`} testid={`booking-${kind}-photos`}>
-      <PhotoGrid photos={photos.filter((p) => p.kind === kind)} />
+      <PhotoGrid photos={photos.filter((p) => p.kind === kind)} onDelete={async (pid) => { if (!window.confirm("Delete this photo?")) return; try { await api.delete(`/admin/bookings/photos/${pid}`); reload(); } catch (e) { toast.error(errMsg(e)); } }} />
       <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium hover:bg-slate-50">
         {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : "+"} Add {kind} photos
         <input type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => { const fs = [...e.target.files]; e.target.value = ""; up(kind, fs); }} data-testid={`booking-upload-${kind}-input`} />

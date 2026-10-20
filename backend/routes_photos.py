@@ -87,6 +87,16 @@ async def upload_job_photo(bid: str, kind: str = Form(...), file: UploadFile = F
     return {"id": str((await tdb.photos.insert_one(doc)).inserted_id)}
 
 
+@admin.delete("/photos/{pid}")
+async def delete_job_photo(pid: str, ctx=Depends(require_admin)):
+    p = await tdb.photos.find_one({"_id": oid(pid), "kind": {"$in": ["before", "after"]}, "is_deleted": False})
+    if not p:
+        raise HTTPException(404, "Photo not found")
+    await _check_booking(p["booking_id"], ctx)
+    await tdb.photos.update_one({"_id": p["_id"]}, {"$set": {"is_deleted": True, "deleted_at": now_iso()}})
+    return {"ok": True}
+
+
 @admin.post("/{bid}/results/send", dependencies=[Depends(require_owner)])
 async def send_results(bid: str, request: Request):
     b = await tdb.bookings.find_one({"_id": oid(bid)})
