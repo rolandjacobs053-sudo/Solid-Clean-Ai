@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader, Panel, useLoad } from "@/components/admin/ui";
 import { ExtrasEditor, RulesEditor, ServicesEditor } from "@/components/admin/PricingEditors";
+import { OpeningHoursEditor } from "@/components/admin/OpeningHoursEditor";
 import { api, errMsg, fmtDateTime, label } from "@/lib/api";
 
 function History() {
@@ -134,13 +135,18 @@ export default function Settings() {
         <TabsContent value="business">
           <Panel>
             <div className="grid gap-4 sm:grid-cols-2">
-              {Object.entries(s.business).map(([k, v]) => (
+              {Object.entries(s.business).filter(([k]) => k !== "opening_hours").map(([k, v]) => (
                 <div key={k}><Label className="capitalize">{label(k)}</Label>
                   {typeof v === "boolean"
                     ? <div className="mt-2"><Switch checked={v} onCheckedChange={(x) => setS({ ...s, business: { ...s.business, [k]: x } })} data-testid={`settings-business-${k}`} /></div>
                     : <Input className="mt-1" value={v} onChange={(e) => setS({ ...s, business: { ...s.business, [k]: typeof v === "number" ? num(e.target.value) : e.target.value } })} data-testid={`settings-business-${k}`} />}
                 </div>
               ))}
+            </div>
+            <div className="mt-8 border-t border-slate-100 pt-5">
+              <p className="mb-1 font-semibold">Opening hours</p>
+              <p className="mb-3 text-sm text-slate-600">Shown on your Contact page and sent to Google with your business details. Your address is not shown publicly (service-area business).</p>
+              <OpeningHoursEditor value={s.business.opening_hours} onChange={(v) => setS({ ...s, business: { ...s.business, opening_hours: v } })} />
             </div>
             <div className="mt-8 border-t border-slate-100 pt-5">
               <p className="text-sm text-slate-600">Demo records (tagged "demo") were added so the dashboard isn't empty. Remove them before going live.</p>

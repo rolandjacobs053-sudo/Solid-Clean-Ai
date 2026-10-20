@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ChatWidget } from "@/components/site/ChatWidget";
 import { api } from "@/lib/api";
 import { DEFAULT_SLUG } from "@/lib/tenant";
+import { hoursSchema } from "@/lib/hours";
 
 export const G = "#023F00";
 export const GOLD = "#8F7E22";
@@ -117,6 +118,12 @@ export default function SiteLayout() {
   const [cfg, setCfg] = useState(null);
   const loc = useLocation();
   useEffect(() => { api.get(`/public/${DEFAULT_SLUG}/config`).then((r) => setCfg(r.data)).catch(() => {}); }, []);
+  useEffect(() => {
+    const el = document.head.querySelector('script[type="application/ld+json"]');
+    const spec = hoursSchema(cfg?.business.opening_hours);
+    if (!el || !spec.length) return;
+    el.textContent = JSON.stringify({ ...JSON.parse(el.textContent), openingHoursSpecification: spec });
+  }, [cfg]);
   if (!cfg) return <div className="p-16 text-center font-mono text-sm text-slate-400">Loading…</div>;
   return (
     <div className="brand-site pb-20 md:pb-0" data-testid="public-site">

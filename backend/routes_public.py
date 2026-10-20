@@ -161,7 +161,7 @@ async def public_config(slug: str):
             "ai_receptionist": company.get("comped") or "ai_receptionist" in feats,
             "policies": [{k: p.get(k) for k in ("key", "title", "published_version", "published_content", "effective_date", "require_acceptance")}
                          async for p in tdb.policies.find({"audience": "public", "published_version": {"$gt": 0}, "unpublished": {"$ne": True}}).sort("order", 1)],
-            "business": {k: s["business"].get(k) for k in ("name", "website", "online_payments", "phone", "logo_url", "brand_primary", "brand_accent", "about_text", "contact_email", "service_areas_text", "business_hours", "payment_mode")}}
+            "business": {k: s["business"].get(k) for k in ("name", "website", "online_payments", "phone", "logo_url", "brand_primary", "brand_accent", "about_text", "contact_email", "service_areas_text", "business_hours", "opening_hours", "payment_mode")}}
 
 
 class ContactIn(BaseModel):

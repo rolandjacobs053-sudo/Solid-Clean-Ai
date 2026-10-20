@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { api, errMsg, fmtDate, gbp } from "@/lib/api";
 import { DEFAULT_SLUG } from "@/lib/tenant";
+import { hoursText } from "@/lib/hours";
 import { BookBtn, CallBtn, G, GOLD, tel } from "@/pages/site/SiteLayout";
 
 const IMG = {
@@ -188,7 +189,7 @@ export function ContactPage() {
         <div className="space-y-3 text-slate-700">
           {real(b.phone) && <p>Phone: <a href={`tel:${b.phone.replace(/\s/g, "")}`} className="font-mono font-semibold" style={{ color: G }} data-testid="contact-phone">{b.phone}</a></p>}
           {real(b.contact_email) && <p>Email: <a href={`mailto:${b.contact_email}`} className="font-semibold" style={{ color: G }}>{b.contact_email}</a></p>}
-          {real(b.business_hours) && <p>Hours: {b.business_hours}</p>}
+          {(hoursText(b.opening_hours) || real(b.business_hours)) && <p data-testid="contact-hours">Hours: {hoursText(b.opening_hours) || b.business_hours}</p>}
           <div className="pt-4"><BookBtn /></div>
         </div>
         {sent ? <p className="rounded-2xl bg-green-50 p-6 text-green-900" data-testid="contact-success">Thank you - we've received your message and will get back to you shortly.</p> : (

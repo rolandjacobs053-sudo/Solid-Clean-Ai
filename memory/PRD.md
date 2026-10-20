@@ -63,3 +63,9 @@ Earlier history: started as an integrated Solid Clean system, then a multi-tenan
 - SeoManager (components/site/SeoManager.jsx) sets per-page title/description/canonical; non-public routes get noindex.
 - Pending on user: verify domain in Google Search Console, submit sitemap, create Google Business Profile; opening hours/address not provided (left out of structured data).
 
+## 2026-10-20 - Opening hours for Google listing
+- Admin Settings > Business: structured Opening hours editor (per day open/closed + times), saved as business.opening_hours.
+- Public config exposes opening_hours; Contact page shows formatted hours; LocalBusiness JSON-LD gets openingHoursSpecification.
+- Address intentionally not published (service-area business). Real hours not yet entered by owner.
+
+
