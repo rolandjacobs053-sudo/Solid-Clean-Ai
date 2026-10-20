@@ -1,0 +1,24 @@
+{
+  "summary": "Frontend-only retest of the commercial routing bug fix plus 3 small UI fixes. Everything requested PASSED on desktop 1920x800 and mobile 390x844. On /quote, choosing quote-service-commercial changes quote-next-btn to 'Continue to free site walkthrough'. Clicking it goes to /commercial-cleaning/request with wt-page and the 10 premises cards (all images load, naturalWidth 900). No residential step appears: 0 quote-ptype-*, 0 property-step-*, and no Studio/Maisonette/Bedrooms text. The page also opens at the top (scrollY 0, including on mobile when /quote was scrolled to 487). The quote-commercial-walkthrough-link callout goes to the same page. Regression checks passed: switching from commercial back to regular or end_of_tenancy restores 'Continue', hides the callout, and goes to property-step-standard or property-step-eot with 4 property types and bedroom/bathroom counters. Full walkthrough submissions passed on desktop (office, regular, weekly) and mobile (?type=pub, deep, one-off), showing the exact confirmation text. On mobile the page scrolled from 300 to 0 after submit and the confirmation card sits below the header. The mobile call bar is hidden on /quote and /commercial-cleaning/request and visible on /. In admin /admin/walkthroughs, 'Type of cleaning required' now shows 'Regular contract cleaning'.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: the commercial routes in QuotePage.jsx (navigate) and BookingSteps.jsx (callout Link) are hard-coded to the absolute path /commercial-cleaning/request. The multi-tenant page /c/:slug/quote also uses QuotePage, so another tenant's commercial customers would land on Solid Clean's walkthrough form (CommercialRequest posts to DEFAULT_SLUG). Consider routing to a tenant-aware path, or hiding or redirecting the commercial service when base !== ''."
+  ],
+  "critical_code_review_comments": [
+    "Multi-tenant: the commercial redirect ignores the tenant base path (see action item). Not tested for other tenants.",
+    "Walkthroughs.jsx: VALUE_LABELS is applied to every details value, free-text fields included. If a free-text answer is exactly 'other', 'good', 'average' or 'regular', it will show as a label. Low risk; better to map only the enum keys (cleaning_type, condition)."
+  ],
+  "updated_files": ["/app/test_reports/iteration_7.json"],
+  "success_rate": {"backend": "not tested (frontend only)", "frontend": "100% (all 5 requested items passed on desktop and mobile)"},
+  "test_credentials": "admin@solidcleanltd.com / SolidClean#2026 (from /app/memory/test_credentials.md) - worked",
+  "seed_data_creation": "Created 2 walkthroughs (TEST_ Office Co, TEST_ Pub Mobile) and 1 lead. All were deleted from Mongo with a TEST_ regex. No photos were uploaded.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Commercial routing fix verified. Test IDs used: quote-service-*, quote-next-btn, quote-commercial-walkthrough-link, wt-type-*, wt-cleaning-type-*, wt-frequency-*, wt-visit-date (ISO fill), wt-visit-time-HH:MM, wt-business-name/contact-name/contact-email/contact-phone/address/postcode, wt-submit-btn, walkthrough-confirmation, walkthrough-answers, mobile-call-bar. Clean up through Mongo: no delete endpoints."
+}
