@@ -264,7 +264,7 @@ async def _cancel_effects(b: dict, refund: Optional[dict] = None):
 
 
 @router.patch("/bookings/{booking_id}")
-async def patch_booking(booking_id: str, body: BookingPatch, ctx=Depends(require_admin)):
+async def patch_booking(booking_id: str, body: BookingPatch, request: Request, ctx=Depends(require_admin)):
     b = await tdb.bookings.find_one({"_id": oid(booking_id)})
     if not b:
         raise HTTPException(404, "Booking not found")
@@ -287,12 +287,14 @@ async def patch_booking(booking_id: str, body: BookingPatch, ctx=Depends(require
     if body.status == "completed":
         await tdb.leads.update_one({"_id": oid(b["lead_id"])}, {"$set": {"status": "completed"}})
         await add_event(b["lead_id"], "job", f"Job completed: {b['service_name']} {when}")
-        review = s["business"].get("review_link") or ""
+        import secrets
+        token = b.get("feedback_token") or secrets.token_urlsafe(16)
+        await tdb.bookings.update_one({"_id": b["_id"]}, {"$set": {"feedback_token": token}})
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host")
         await log_comm(c["email"], "email", "feedback_review_request", "How did we do?",
-                       f"Hi {c['name']}, thank you for choosing {company_name()}. We'd value your honest feedback"
-                       + (f" - you can leave a review here: {review}" if review.startswith("https://") else " - just reply to this email")
-                       + ". If anything wasn't right, just reply and we'll put it right.",
-                       kind="follow_up", lead_id=b["lead_id"])
+                       f"Hi {c['name']}, thank you for choosing {company_name()}. We'd value your honest feedback on your {b['service_name']} - "
+                       "it only takes a minute. If anything wasn't right, just reply and we'll put it right.",
+                       kind="follow_up", lead_id=b["lead_id"], link=("Rate your clean", f"https://{host}/feedback/{booking_id}?t={token}"))
     elif body.status == "cancelled":
         await _cancel_effects(b)
     return {"ok": True}

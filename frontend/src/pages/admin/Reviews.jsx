@@ -42,14 +42,22 @@ function ReviewCard({ r, reload }) {
     setBusy(false);
   };
   const approve = async () => { await api.patch(`/admin/reviews/${r.id}`, { response: resp, status: "approved" }); toast.success("Reply approved - post it on Google Business Profile"); reload(); };
+  const hide = async (hidden) => {
+    const hidden_reason = hidden ? window.prompt("Why are you hiding this review? (only for offensive, fake or off-topic content - not for negative reviews)") : "";
+    if (hidden && !hidden_reason) return;
+    await api.patch(`/admin/reviews/${r.id}`, { hidden, hidden_reason }); toast.success(hidden ? "Hidden from the website" : "Shown on the website"); reload();
+  };
+  const web = r.source === "customer_feedback";
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5" data-testid="review-card">
       <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-3"><Stars n={r.rating} /><span className="font-medium">{r.author}</span><DemoTag show={r.demo} /></div><div className="flex items-center gap-2"><span className="font-mono text-xs text-slate-400">{fmtDate(r.review_date)}</span><StatusBadge status={r.status} /></div></div>
       <p className="mt-3 text-sm text-slate-600">{r.text}</p>
+      {web && <p className="mt-2 font-mono text-[11px] text-slate-500" data-testid={`review-web-status-${r.id}`}>Verified customer · {r.service_name} · {!r.publish_consent ? "Private feedback (no consent to publish)" : r.hidden ? `Hidden from website: ${r.hidden_reason}` : "Shown on your website"}</p>}
       <Textarea className="mt-4" rows={3} placeholder="Your public reply" value={resp} onChange={(e) => setResp(e.target.value)} data-testid={`review-response-input-${r.id}`} />
       <div className="mt-2 flex gap-2">
         <Button size="sm" variant="outline" onClick={draft} disabled={busy} data-testid={`review-draft-btn-${r.id}`}>{busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />}Draft with AI</Button>
         <Button size="sm" disabled={!resp} onClick={approve} className="bg-teal-600 hover:bg-teal-700" data-testid="crm-review-approve-btn">Approve reply</Button>
+        {web && r.publish_consent && <Button size="sm" variant="ghost" onClick={() => hide(!r.hidden)} data-testid={`review-hide-btn-${r.id}`}>{r.hidden ? "Show on website" : "Hide from website"}</Button>}
       </div>
     </div>
   );
@@ -62,7 +70,7 @@ export default function Reviews() {
   const s = data.stats;
   return (
     <div data-testid="admin-reviews-page">
-      <PageHeader eyebrow="Reputation" title="Reviews" desc="Review requests go to every completed job - no filtering of unhappy customers. Replies are AI-drafted and only published after your approval.">
+      <PageHeader eyebrow="Reputation" title="Reviews" desc="Every completed job gets a 'How did we do?' email - no filtering of unhappy customers. Reviews customers agree to share appear on your website automatically; UK law doesn't allow hiding genuine negative reviews or publishing invented ones. Replies are AI-drafted and only published after your approval.">
         <Button onClick={() => setAdding(true)} className="bg-slate-900 hover:bg-teal-700" data-testid="reviews-add-btn"><Plus className="mr-1 h-4 w-4" />Log review</Button>
       </PageHeader>
       <Notice testid="reviews-gbp-notice">Google Business Profile sync is <b>NOT CONNECTED YET</b> (needs GBP API approval). Log reviews manually for now.</Notice>

@@ -117,6 +117,21 @@ async def recurring_cron(request: Request, background: BackgroundTasks):
     return {"ok": True}
 
 
+@admin.get("")
+async def list_plans():
+    plans = await tdb.recurring_plans.find({}, {"stripe_customer": 0}).sort("next_date", 1).to_list(500)
+    stats = {}
+    async for b in tdb.bookings.find({"recurring_plan_id": {"$in": [str(p["_id"]) for p in plans]}}, {"recurring_plan_id": 1, "date": 1, "status": 1, "payment_status": 1}).sort("date", 1):
+        s = stats.setdefault(b["recurring_plan_id"], {"visits": 0, "last_visit": None})
+        s["visits"] += 1
+        s["last_visit"] = {"date": b["date"], "status": b["status"], "payment_status": b["payment_status"]}
+    rows = []
+    for p in plans:
+        card = bool(p.pop("payment_method", None))
+        rows.append({**out(p), "card_saved": card, **stats.get(str(p["_id"]), {"visits": 0, "last_visit": None})})
+    return rows
+
+
 @admin.get("/{plan_id}")
 async def get_plan(plan_id: str):
     p = await tdb.recurring_plans.find_one({"_id": oid(plan_id)}, {"stripe_customer": 0, "payment_method": 0})

@@ -12,6 +12,7 @@ import PaymentResult from "@/pages/PaymentResult";
 import TipPage from "@/pages/site/TipPage";
 import ResultsPage from "@/pages/site/ResultsPage";
 import ResidentialBooking from "@/pages/site/ResidentialBooking";
+import FeedbackPage from "@/pages/site/FeedbackPage";
 import Unsubscribe from "@/pages/Unsubscribe";
 import AdminLogin from "@/pages/AdminLogin";
 import Signup from "@/pages/Signup";
@@ -41,6 +42,7 @@ import CommercialPage from "@/pages/site/CommercialPage";
 import CommercialRequest from "@/pages/site/CommercialRequest";
 import Walkthroughs from "@/pages/admin/Walkthroughs";
 import CarpetQuotes from "@/pages/admin/CarpetQuotes";
+import RegularClients from "@/pages/admin/RegularClients";
 import CarpetPage from "@/pages/site/CarpetPage";
 import CarpetRequest from "@/pages/site/CarpetRequest";
 import CarpetQuoteView from "@/pages/site/CarpetQuoteView";
@@ -112,6 +114,7 @@ function App() {
               <Route path="/payment/:result" element={<PaymentResult />} />
               <Route path="/tip/:bookingId" element={<TipPage />} />
               <Route path="/results/:bookingId" element={<ResultsPage />} />
+              <Route path="/feedback/:bookingId" element={<FeedbackPage />} />
               <Route path="/unsubscribe" element={<Unsubscribe />} />
               <Route path="/faq" element={<FaqPage />} />
               <Route path="/areas" element={<AreasPage />} />
@@ -141,6 +144,7 @@ function App() {
               <Route path="schedule" element={<Schedule />} />
               <Route path="walkthroughs" element={<Walkthroughs />} />
               <Route path="carpet-quotes" element={<CarpetQuotes />} />
+              <Route path="regular-clients" element={<RegularClients />} />
               <Route path="receptionist" element={<Conversations />} />
               <Route path="outreach" element={<Outreach />} />
               <Route path="reviews" element={<Reviews />} />

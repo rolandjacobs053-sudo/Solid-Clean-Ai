@@ -1,11 +1,11 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { BarChart3, Bot, Building2, CalendarDays, CalendarRange, CreditCard, ExternalLink, LogOut, Mail, Megaphone, ScrollText, Search, Send, Settings, Sparkles, Star, UserCog, Users } from "lucide-react";
+import { BarChart3, Bot, Building2, CalendarDays, CalendarRange, CreditCard, ExternalLink, LogOut, Mail, Megaphone, Repeat, ScrollText, Search, Send, Settings, Sparkles, Star, UserCog, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { InstallApp } from "@/components/admin/InstallApp";
 import { fmtDate } from "@/lib/api";
 
 const NAV = [
-  ["", "Overview", BarChart3, "analytics"], ["leads", "Leads & CRM", Users, "crm"], ["bookings", "Bookings", CalendarDays, "quotes_bookings"], ["schedule", "Staff schedule", CalendarRange, "quotes_bookings"], ["walkthroughs", "Site walkthroughs", Building2, "crm"], ["carpet-quotes", "Carpet quotes", Sparkles, "crm"],
+  ["", "Overview", BarChart3, "analytics"], ["leads", "Leads & CRM", Users, "crm"], ["bookings", "Bookings", CalendarDays, "quotes_bookings"], ["schedule", "Staff schedule", CalendarRange, "quotes_bookings"], ["walkthroughs", "Site walkthroughs", Building2, "crm"], ["carpet-quotes", "Carpet quotes", Sparkles, "crm"], ["regular-clients", "Regular clients", Repeat, "quotes_bookings"],
   ["receptionist", "AI receptionist", Bot, "ai_receptionist"], ["growth", "SEO & Google Ads", Search, "marketing"], ["outreach", "Cold email", Send, "outreach"],
   ["reviews", "Reviews", Star, "reviews"], ["marketing", "Marketing spend", Megaphone, "analytics"], ["comms", "Communications", Mail, "crm"],
   ["staff", "Team", UserCog, null], ["policies", "Policies & terms", ScrollText, null], ["settings", "Settings", Settings, null], ["billing", "Billing", CreditCard, null],

@@ -182,9 +182,54 @@ async def contact(body: ContactIn):
 
 @public.get("/reviews")
 async def public_reviews():
-    rows = await tdb.reviews.find({"demo": {"$ne": True}}).sort("review_date", -1).to_list(100)
+    rows = await tdb.reviews.find({"demo": {"$ne": True}, "hidden": {"$ne": True}, "$or": [{"source": {"$ne": "customer_feedback"}}, {"publish_consent": True}]}).sort("review_date", -1).to_list(100)
     return [{"author": r["author"], "rating": r["rating"], "text": r.get("text", ""), "review_date": r["review_date"], "platform": r.get("platform"),
+             "verified": r.get("source") == "customer_feedback", "service": r.get("service_name"),
              "response": r.get("response") if r.get("status") == "approved" else ""} for r in rows]
+
+
+class FeedbackIn(BaseModel):
+    t: str
+    rating: int = Field(ge=1, le=5)
+    text: str = Field("", max_length=2000)
+    display_name: str = Field(min_length=1, max_length=60)
+    publish_consent: bool = False
+
+
+async def _feedback_booking(bid: str, t: str) -> dict:
+    b = await tdb.bookings.find_one({"_id": oid(bid)})
+    if not b or not b.get("feedback_token") or not secrets.compare_digest(b["feedback_token"], t):
+        raise HTTPException(404, "This feedback link is not valid")
+    return {"service_name": b["service_name"], "date": b["date"], "name": b["customer"]["name"], "lead_id": b.get("lead_id"), "done": bool(b.get("review_id"))}
+
+
+@public.get("/feedback/{bid}")
+async def feedback_info(bid: str, t: str):
+    info = await _feedback_booking(bid, t)
+    first, *rest = info["name"].split()
+    s = await get_settings()
+    return {"service_name": info["service_name"], "date": info["date"], "first_name": first, "suggested_name": f"{first} {rest[-1][0]}." if rest else first,
+            "done": info["done"], "google_link": s["business"].get("review_link") if (s["business"].get("review_link") or "").startswith("https://") else ""}
+
+
+@public.post("/feedback/{bid}")
+async def submit_feedback(bid: str, body: FeedbackIn):
+    info = await _feedback_booking(bid, body.t)
+    if info["done"]:
+        raise HTTPException(409, "Thank you - we've already received your feedback for this clean.")
+    status = "needs_attention" if body.rating <= 3 else "new"
+    doc = {"author": body.display_name.strip(), "rating": body.rating, "text": body.text.strip(), "platform": "website", "source": "customer_feedback",
+           "booking_id": bid, "service_name": info["service_name"], "publish_consent": body.publish_consent, "review_date": now().date().isoformat(),
+           "status": status, "response": "", "created_at": now_iso()}
+    rid = str((await tdb.reviews.insert_one(doc)).inserted_id)
+    res = await tdb.bookings.update_one({"_id": oid(bid), "review_id": {"$exists": False}}, {"$set": {"review_id": rid}})
+    if not res.modified_count:
+        await tdb.reviews.delete_one({"_id": oid(rid)})
+        raise HTTPException(409, "Thank you - we've already received your feedback for this clean.")
+    await add_event(info["lead_id"], "review", f"Customer feedback: {body.rating} stars")
+    await notify_owner(await get_settings(), f"{body.rating}-star feedback from {info['name']}" + (" - needs attention" if status == "needs_attention" else ""),
+                       f"{info['name']} rated their {info['service_name']} {body.rating}/5: {body.text or '(no comment)'}. Publish consent: {'yes' if body.publish_consent else 'no'}.", info["lead_id"])
+    return {"ok": True}
 
 
 @public.post("/quote/preview")

@@ -62,6 +62,8 @@ class ReviewIn(BaseModel):
 class ReviewPatch(BaseModel):
     response: Optional[str] = None
     status: Optional[str] = None
+    hidden: Optional[bool] = None
+    hidden_reason: Optional[str] = Field(None, max_length=300)
 
 
 class SpendIn(BaseModel):

@@ -153,7 +153,7 @@ export function ReviewsPage() {
       <div className="grid gap-4 md:grid-cols-2">{rows?.map((r, i) => (
         <div key={i} className="rounded-2xl border bg-white p-6" data-testid="site-review-card">
           <div className="flex items-center justify-between"><span className="flex">{[1, 2, 3, 4, 5].map((n) => <Star key={n} className={`h-4 w-4 ${n <= r.rating ? "fill-amber-400 text-amber-400" : "text-slate-200"}`} />)}</span><span className="font-mono text-xs text-slate-400">{fmtDate(r.review_date)}</span></div>
-          <p className="mt-3 text-slate-700">{r.text}</p><p className="mt-2 text-sm font-semibold" style={{ color: G }}>{r.author}</p>
+          <p className="mt-3 text-slate-700">{r.text}</p><p className="mt-2 text-sm font-semibold" style={{ color: G }}>{r.author}{r.verified && <span className="ml-2 font-mono text-[10px] font-normal uppercase tracking-wider text-[#8F7E22]" data-testid="site-review-verified">Verified customer{r.service ? ` · ${r.service}` : ""}</span>}</p>
           {r.response && <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600"><b>Our reply:</b> {r.response}</p>}
         </div>
       ))}</div>
