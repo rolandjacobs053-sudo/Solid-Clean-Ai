@@ -9,7 +9,7 @@ import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from comms import add_event, log_comm, quote_email, upsert_lead
+from comms import add_event, booking_link, log_comm, quote_email, upsert_lead
 from core import access_state, company_name, current_company, db, get_settings, now, now_iso, oid, out, plan_features, set_tenant, tdb
 from pricing import compute_quote, fmt_date, slots_for
 
@@ -150,10 +150,9 @@ async def save_quote(body: QuoteSave, request: Request):
                                 {"marketing_consent": body.contact.marketing_consent})
     await tdb.leads.update_one({"_id": oid(lead_id), "status": "new"}, {"$set": {"status": "quoted"}})
     quote_id = await store_quote(q, result, lead_id, src)
-    origin = request.headers.get("origin", "")
     if result["status"] == "ok":
-        await log_comm(body.contact.email, "email", "quote_sent", f"Your Solid Clean quote - £{result['total']:.2f}",
-                       quote_email(body.contact.name, result, f"{origin}/c/{current_company.get()['slug']}/quote?q={quote_id}"), lead_id=lead_id)
+        await log_comm(body.contact.email, "email", "quote_sent", f"Your {company_name()} quote - £{result['total']:.2f}",
+                       quote_email(body.contact.name, result), lead_id=lead_id, link=booking_link(request, current_company.get()["slug"], quote_id))
     else:
         await log_comm(body.contact.email, "email", "enquiry_ack", "We've received your enquiry",
                        f"Hi {body.contact.name}, thanks for your enquiry. A member of our team will review the details and contact you shortly.", lead_id=lead_id)
@@ -248,7 +247,11 @@ async def finalize_booking(booking_id: str, paid: bool = True):
     await notify_owner(s, f"New paid booking - {when}", f"{c['name']} {c['phone']} - {b['service_name']} at {b['postcode']}, £{b['total']:.2f}. Notes: {b.get('access_notes') or '-'}", b["lead_id"])
     remind_at = (date.fromisoformat(b["date"]) - timedelta(days=1)).isoformat() + "T17:00:00+00:00"
     await log_comm(c["phone"], "sms", "appointment_reminder", "Reminder",
-                   f"Reminder: Solid Clean is booked for {when}. Please ensure access as discussed.", lead_id=b["lead_id"], scheduled_for=remind_at)
+                   f"Reminder: {company_name()} is booked for {when}. Please ensure access as discussed.", lead_id=b["lead_id"], scheduled_for=remind_at)
+    await log_comm(c["email"], "email", "appointment_reminder", f"Reminder: your clean is tomorrow - {when}",
+                   f"Hi {c['name']}, a quick reminder that your {b['service_name']} with {company_name()} is booked for {when} at {b['postcode']}. "
+                   "Please make sure we can access the property as discussed. To make changes, reply to this email or call us.",
+                   lead_id=b["lead_id"], scheduled_for=remind_at)
 
 
 @router.get("/payments/status/{session_id}")

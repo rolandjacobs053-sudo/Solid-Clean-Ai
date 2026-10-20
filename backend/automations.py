@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from comms import log_comm
+from comms import deliver_email, log_comm
 from core import db, get_settings, now, now_iso, oid, set_tenant, tdb
 
 
@@ -21,10 +21,13 @@ async def run_automations() -> dict:
                                 f"Hi {lead['name']}, just checking whether you had any questions about your {q['service_name']} quote "
                                 f"(£{q['total']:.2f}). Reply to this email or book online any time.", kind="follow_up", lead_id=q["lead_id"])
         await tdb.quotes.update_one({"_id": q["_id"]}, {"$inc": {"follow_ups_sent": 1}, "$set": {"last_follow_up_at": now_iso()}})
-        follow_ups += status == "simulated"
-    res = await tdb.communications.update_many({"status": "scheduled", "scheduled_for": {"$lte": now_iso()}},
-                                              {"$set": {"status": "simulated", "sent_at": now_iso()}})
-    return {"quote_follow_ups_sent": follow_ups, "scheduled_messages_sent": res.modified_count, "ran_at": now_iso()}
+        follow_ups += status == "sent"
+    due = 0
+    async for c in tdb.communications.find({"status": "scheduled", "scheduled_for": {"$lte": now_iso()}}):
+        status = await deliver_email(c["to"], c["subject"], c["body"], c.get("link")) if c["channel"] == "email" else "simulated"
+        await tdb.communications.update_one({"_id": c["_id"]}, {"$set": {"status": status, "sent_at": now_iso()}})
+        due += 1
+    return {"quote_follow_ups_sent": follow_ups, "scheduled_messages_sent": due, "ran_at": now_iso()}
 
 
 async def run_all_companies() -> int:

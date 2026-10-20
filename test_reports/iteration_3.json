@@ -1,0 +1,34 @@
+{
+  "summary": "Phase 2 Solid Clean (public website + staff RBAC + booking → Stripe) testing complete. Backend: 14/14 pytest tests in /app/backend/tests/test_solid_clean_phase2.py all green covering: (1) /api/public/solid-clean/config has brand phone 020 3728 4419, logo /brand/solidclean-logo.png and NO 'parking'/'airbnb' leak; (2) public /reviews returns empty list (demo reviews filtered out, no 'demo' key leaks); (3) unauth GET on /api/admin/{leads,overview,bookings,settings,policies} all return 401; (4) /api/public/solid-clean/contact creates a lead with source='website' visible in /admin/leads; (5) end-to-end booking POST /api/public/solid-clean/bookings with service=regular, postcode=CR0 1AA, 2BR/1BA/1LR returns a checkout_url that starts with https://checkout.stripe.com/, booking is persisted and appears in owner's /api/admin/bookings?status=pending_payment with customer email matching; (6) service base price edit via PUT /admin/settings reflects on /api/public/solid-clean/quote/preview immediately and is restored on teardown (confirmed booking's total not retested since snapshotted into the booking doc at insert time); (7) staff RBAC: owner creates TEST_Cleaner staff -> staff login -> GET /admin/bookings returns only bookings where assigned_to==staff_uid; GET /admin/leads, /admin/overview, /admin/settings all 403; GET /admin/policies 200; PATCH on a non-assigned booking 403; PATCH own assigned booking with assigned_to in body also 403 (staff cannot reassign); staff deactivated on teardown; (8) owner regression: /admin/overview, /admin/leads, /admin/settings all 200; (9) platform regression: /platform/companies, /platform/plans both 200. Frontend (Playwright): HomePage loads with correct logo + phone (020 3728 4419) + brand green #023F00, hero Book-a-Cleaning + Get-a-Quote buttons present and route to /quote, zero /admin or /login links in public page HTML. /services renders 4 service cards. /reviews shows site-reviews-empty testid and zero review cards. /privacy, /cookies, /terms all show policy-pending with 'being finalised'. /contact form submits and shows contact-success. /admin while logged-out redirects to /admin/login. Mobile 390px: no horizontal overflow (scrollWidth==clientWidth==390), menu button opens mobile nav with Book + Quote buttons. /quote and public HTML contain no 'parking' or 'airbnb' tokens. /admin/login page has no 'signup' / 'sign up' text.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_solid_clean_phase2.py",
+    "/app/backend/tests/test_solid_clean_phase1.py",
+    "/app/backend/tests/test_saas.py",
+    "/app/test_reports/pytest/phase2.xml"
+  ],
+  "action_items": [
+    "Container date is October 2026 (future). Availability window is max_advance_days=60. The phase2 test loops days 2..60 to find a bookable slot, so it is portable, but main agent should be aware if real 'today' moves further.",
+    "Phase2 test leaves one booking in 'abandoned' status per run (release endpoint called in fixture teardown). Harmless and not shown by default /admin/bookings query (status $nin abandoned)."
+  ],
+  "critical_code_review_comments": [
+    "routes_admin.py:154 patch_booking - staff rule 'body.status != completed or body.assigned_to is not None' means staff can PATCH only with status='completed' and no assigned_to; attempts to send status='confirmed' or 'cancelled' return 403. This matches the spec ('may only mark own job completed') but UI must not show other actions to staff.",
+    "routes_saas.py:215 list_staff uses require_admin (not require_owner). Because /api/admin/staff is NOT in STAFF_PATHS, the require_admin dependency itself 403s for staff role before the handler runs - correct, but defence-in-depth would be to use require_owner explicitly.",
+    "routes_public.py:282 stripe_webhook still uses json.loads(str(event['data']['object'])) (brittle round-trip via Python repr). Prefer event['data']['object'].to_dict(). Carried forward from iterations 1 & 2.",
+    "routes_public.py:189 create_booking accepts arbitrary quote_id from body without verifying it belongs to the same lead/company; find_one is tenant-scoped so cross-tenant hijack is blocked, but a malicious caller inside the same tenant could reuse another customer's quote_id and overwrite its fields on line 191.",
+    "routes_admin.py:146 list_bookings default filter excludes 'abandoned' only; cancelled bookings are returned together with confirmed/pending - owner UI should tab-filter. Not a bug but noteworthy.",
+    "No rate-limit coverage for /api/public/* (claimed 180/min) was exercised to avoid interfering with testing. Implementation in server.py middleware appears to use IP + path prefix - visually inspected, matches spec.",
+    "SiteLayout.jsx Header renders CleanOps dark login panel on /admin/login but the Sign-in button is a plain <button>, not type='submit'. Clicking still works via onClick in AdminLogin.jsx, but Enter-to-submit may not; low priority."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_solid_clean_phase2.py (new, 14 tests - all green)"
+  ],
+  "success_rate": {"backend": "100% (14/14 phase2 + 13/13 phase1 + prior saas all green)", "frontend": "100% (10/10 UI checks)"},
+  "test_credentials": "Solid Clean owner admin@solidcleanltd.com / SolidClean#2026 ; Platform admin gilctei@hotmail.com / CleanOps#2026",
+  "seed_data_creation": "Per run: 1 TEST_booker_<hex>@example.com lead + 1 abandoned booking (CR0 1AA), 1 test_contact_<hex>@example.com lead (contact form), 1 test_ui_contact@example.com lead (Playwright contact submit), 1 test_cleaner_<hex>@example.com staff user (deactivated on teardown). All prefixed TEST_ or test_ and @example.com. Price mutation to 'regular' base is restored in fixture teardown.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Full Solid Clean regression lives in /app/backend/tests/test_solid_clean_phase{1,2}.py (27 tests) + /app/backend/tests/test_saas.py (34 tests). Phase2 uses booking_and_cleanup fixture that loops availability over the next 60 days to tolerate container-date drift. Staff fixture auto-deactivates. Container date observed as Oct 2026 (future), so avoid hard-coding future ISO dates > container_today+60. Stripe test key is live in backend/.env (test mode) and returns a real checkout.stripe.com URL - do not actually complete payment in automated runs (would create real test-mode sessions). Public rate limits: 180/min /api/public/*, 60/min /api/auth/* - phase2 keeps all public requests well under this.",
+  "rca of the issue": "N/A - no bugs found. All acceptance criteria in the review request are satisfied by the current implementation."
+}

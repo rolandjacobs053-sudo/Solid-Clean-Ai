@@ -10,7 +10,7 @@ SOLID_BUSINESS = {"name": "Solid Clean Ltd", "website": "https://solidcleanltd.c
 BUSINESS_DEFAULTS = {"phone": "[Business phone]", "logo_url": "", "brand_primary": "#0F766E", "brand_accent": "#0F172A", "payment_mode": "full_upfront",
                      "payment_instructions": "", "online_payments": True, "business_hours": "[Business hours]", "invoice_legal_name": "[Legal company name]",
                      "invoice_address": "[Registered address]", "company_number": "[Company number]", "vat_registered": False, "vat_number": "",
-                     "about_text": "", "contact_email": "[Contact email]", "service_areas_text": ""}
+                     "about_text": "", "contact_email": "[Contact email]", "service_areas_text": "", "voice_number": ""}
 
 
 async def migrate_company(company: dict):
@@ -18,7 +18,16 @@ async def migrate_company(company: dict):
     s = await db.settings.find_one({"company_id": cid})
     if s:
         p = s["pricing"]
-        p["services"] = [{**SERVICE_DEFAULTS, **x} for x in p["services"] if "airbnb" not in x["key"].lower() and "airbnb" not in x["name"].lower()]
+        p["services"] = [{**SERVICE_DEFAULTS, **x} for x in p["services"] if "airbnb" not in x["key"].lower() and "airbnb" not in x["name"].lower() and x["key"] != "standard"]
+        if not s.get("extras_v2"):
+            for x in p["extras"]:
+                if x["key"] == "oven" and x["name"] == "Oven deep clean":
+                    x["name"] = "Single oven deep clean"
+                if x["key"] == "supplies" and not x.get("price"):
+                    x["price"] = 25
+            have = {x["key"] for x in p["extras"]}
+            p["extras"] += [e for e in DEFAULT_SETTINGS["pricing"]["extras"] if e["key"] not in have]
+            await db.settings.update_one({"_id": s["_id"]}, {"$set": {"extras_v2": True}})
         p.pop("parking_surcharge", None)
         p.setdefault("short_notice", {"days": 2, "type": "percent", "value": 0})
         p.setdefault("promo_codes", [])

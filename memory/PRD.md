@@ -1,37 +1,34 @@
-# CleanOps - AI SaaS for cleaning companies
+# Solid Clean Ltd - Business platform (on CleanOps multi-tenant core)
 
-## Original problem statement (latest, verbatim)
-"I want to build an AI-powered SaaS platform for cleaning companies that I can sell to businesses worldwide through monthly subscriptions. The platform should include SEO tools, Google Ads management, cold email marketing, an AI receptionist that answers calls and customer questions, automated quotations and bookings, CRM, customer management, employee management and business analytics—all in one place. The platform must support multiple cleaning companies, with each company having its own account, data, settings and employees. I want to use Stripe to manage subscriptions. Companies should be able to choose a pricing plan, pay monthly or annually, upgrade or downgrade their plans, and cancel their subscriptions. Payments should be collected automatically, with failed-payment notifications and appropriate access restrictions for unpaid accounts. I also need an administrator dashboard to manage companies, subscription plans, payments and the overall platform. Please provide a quotation for developing an MVP and the complete platform, including the development cost, timeline, hosting, third-party software costs and ongoing maintenance. My goal is to build a scalable software business that generates recurring monthly revenue from cleaning companies, rather than developing software exclusively for my own company."
-Follow-ups: "This should not be a cleaning website" / "It's not stripe subscription plan. I want to be able to accept payment via stripe" / "I don't want a cleaning company website or a landing page. I want a fully functional, AI-powered SaaS web application ... focus on building the actual software application, including its dashboard, functionality, integrations and subscription system ... support multiple cleaning businesses ... scale and add more features."
-(Earlier brief: Solid Clean Ltd integrated AI cleaning business system — now the demo tenant.)
-
-## Choices
-- Build the SaaS MVP now, with the quotation as a page; self-serve sign-up with a 14-day trial (Growth); editable placeholder plans Starter £49 / Growth £99 / Pro £199 (annual = 10x monthly)
-- Claude Sonnet 5.5 via Emergent LLM key; JWT cookie auth; Stripe claimable sandbox (test mode)
-- Platform name "CleanOps" is a placeholder
+## Original problem statement (latest, 2026-10-20 - "SOLID CLEAN LTD COMPLETE MASTER PROMPT", key wording)
+"I own Solid Clean Ltd. I want to develop my existing Emergent application into a professional, secure, scalable and cost-effective business platform ... one central private management system while keeping my public website separate."
+Non-negotiables (verbatim): "Modify my existing Emergent project. Do not create a new replacement project. Do not rebuild the entire application from scratch. Do not import my old WordPress website ... Preserve existing working features ... Do not delete data or perform destructive database changes without my approval ... Do not change my live domain, DNS, email routing, payment configuration, company details or live prices without permission. Do not purchase software, API credits, subscriptions ... without my explicit approval. Do not invent company information, prices, legal terms ... Audit the existing application before making changes. Implement changes in stages."
+"NEVER ASK CUSTOMERS ABOUT PARKING." "Never include Airbnb cleaning or holiday-let cleaning anywhere."
+Modules requested: public website + booking, policies & acknowledgments, central pricing, AI support, AI telephone receptionist (020 3728 4419 - do not port), CRM, commercial lead gen, sales pipeline (13 stages), commercial quotations & agreements, Contracts & Electronic Signatures (templates, wizard, approval workflow, multi-signatory, audit trail, signed PDF storage, renewals, onboarding/offboarding), staff ops (scheduling, checklists, QC, incidents), OWNER-ONLY Road Charge & Travel Cost Checker (Congestion Charge/ULEZ, profitability), payments/invoices/expenses, SEO, marketing, AI daily report, RBAC (Owner, Administrator, Manager, Supervisor, Cleaner, Contractor, Contract recipient, Customer), security, cost control.
+Phases requested: 1 Audit → 2 Website & booking → 3 Private system/RBAC → 4 Contracts & e-sign → 5 Travel checker → 6 Commercial sales → 7 AI & marketing → 8 E2E testing.
+Approved company details: Solid Clean Ltd, solidcleanltd.com, info@solidcleanltd.com, 020 3728 4419, London and Surrey.
+Earlier history: started as an integrated Solid Clean system, then a multi-tenant SaaS ("CleanOps"), then refocused on Solid Clean first with the SaaS core kept in the background.
 
 ## Architecture
-- FastAPI + MongoDB. Multi-tenant through `company_id` on every document; `core.TenantDB` scopes all queries using a ContextVar set by the auth or slug dependency
-- Roles: platform_admin, owner, staff. Access: `access_state()` checks trialing (until trial end), active, past_due (7-day grace), suspended, comped
-- Plan features gate backend and nav: quotes_bookings, crm, analytics, ai_receptionist, reviews, outreach, marketing
-- Stripe: plans synced to Products/Prices (lookup keys `{plan}_monthly|annual`), Checkout (subscription), in-app plan switch with proration, cancel/resume at period end, Billing Portal, invoices; webhook `/api/stripe/webhook` with a `/api/billing/sync` fallback
-- Customer booking payments: Stripe Checkout through the platform account (tax-inclusive prices). Company setting `online_payments`; when it's off, the booking is confirmed and payment instructions are shown
-- Routes: `/login`, `/signup`, `/admin/*` (company workspace), `/platform/*` (platform admin), `/c/:slug/quote` (each company's public booking widget, plus AI chat)
+- FastAPI + MongoDB, multi-tenant via `company_id` + ContextVar (`core.TenantDB`). Public routes use `/api/public/{slug}`; admin routes use the JWT `company_id`
+- Roles now: platform_admin, owner, staff (staff = own assigned bookings + policies)
+- Stripe Checkout (TEST mode) for booking payments into one account; SaaS subscriptions exist in the background
+- Email: `mailer.py` (Emergent-managed Resend) + `comms.log_comm` (sends transactional email; marketing is simulated; scheduled items are sent by `automations.run_automations`)
+- Voice: `routes_voice.py` Twilio TwiML webhooks (`/api/voice/incoming`, `/api/voice/{slug}/{cid}/speech`), tenant chosen by `business.voice_number`; needs `TWILIO_AUTH_TOKEN`
+- Audit report: `/app/memory/AUDIT_REPORT.md`
 
-## Implemented (2026-10-11)
-- Company workspace: overview analytics (revenue, CPL, CAC, conversion, channel profit), CRM leads + drawer, bookings (complete/cancel/assign staff), AI receptionist conversations, SEO audit + AI keyword/landing-page plan + AI Google Ads builder, cold email (AI drafts, reply classification, suppression list), reviews (AI reply drafts), marketing spend, communications log, team/staff, settings (pricing, availability, KB, business), billing
-- Platform admin: MRR/ARR overview, companies (extend trial, suspend/reactivate), plan editor (synced to Stripe), payments, quotation, Solid Clean proposal
-- Verified: tests 34/34 backend and 11/11 UI; subscribe → switch plan → cancel/resume → portal → past-due lock-out checked against the Stripe test API
+## Implemented
+- 2026-10-11: SaaS core, Solid Clean public site + booking, CRM, AI chat, marketing tools, policies, Stripe, RBAC, Airbnb/parking removal
+- 2026-10-20: removed Standard Cleaning; removed "Get a Quote" buttons (Book a Cleaning kept); new extras (Single/Double oven, Dishwasher, Blinds); Supplies & equipment £25; real transactional email (quotes, confirmations, day-before reminders); Staff schedule weekly calendar (/admin/schedule); AI phone receptionist code (NOT CONNECTED - awaiting Twilio); audit report
 
 ## Mocked / not connected
-- Email/SMS/WhatsApp sending SIMULATED (logged only); cold email sending SIMULATED; email verification is format-only
-- Phone AI receptionist, Google Ads/GSC/GA4/GBP APIs: not connected
-- Booking payments go to the platform Stripe account (Stripe Connect not built yet)
+- SMS/WhatsApp SIMULATED; cold email SIMULATED; phone receptionist NOT CONNECTED; Google APIs not connected; Stripe TEST mode
+- Owner alert email is a placeholder; provisional prices: Double oven £65, Dishwasher £20, Blinds £20
 
-## Backlog
-- P0: Stripe Connect so each company gets paid directly; real email provider (Resend) for transactional and billing emails
-- P1: Voice AI receptionist (Vapi/Retell + Twilio); Google OAuth integrations; multi-currency/time zones; password reset
-- P2: cleaner mobile app/rotas; WhatsApp; audit logs; data retention tools
-
-## Next tasks
-- Claim the Stripe sandbox; replace placeholder plan prices; connect an email provider
+## Roadmap (awaiting owner approval of plan)
+- P0 Phase 2: publish approved policies (drafts need review), parking policy wording, SEO basics (title/meta/sitemap/robots/schema), Solid Clean branding in admin, CORS lock-down, scheduled jobs via platform crons
+- P0 Phase 3: extended roles (Administrator, Manager, Supervisor, Cleaner, Contractor), per-permission server checks
+- P1 Phase 4: Contracts & Electronic Signatures (built-in signing recommended) + object storage
+- P1 Phase 5: owner-only Road Charge & Travel Cost Checker + job profitability + expenses
+- P1 Phase 6: commercial pipeline (13 stages), commercial quotes & agreements
+- P2 Phase 7: Twilio voice connect, SMS, daily AI report, Google integrations

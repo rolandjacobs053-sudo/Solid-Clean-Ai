@@ -22,6 +22,7 @@ import routes_policies
 import routes_public
 import routes_saas
 import routes_tools
+import routes_voice
 from automations import run_all_companies
 from core import client
 from seed import seed_all
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="CleanOps")
 for r in (routes_auth.router, routes_saas.router, routes_saas.platform, routes_public.router, routes_public.public, routes_chat.router,
-          routes_admin.router, routes_growth.router, routes_growth.outreach, routes_growth.reviews_r, routes_tools.router, routes_policies.router):
+          routes_admin.router, routes_growth.router, routes_growth.outreach, routes_growth.reviews_r, routes_tools.router, routes_policies.router, routes_voice.router, routes_voice.admin):
     app.include_router(r)
 
 HITS = defaultdict(deque)

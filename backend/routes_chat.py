@@ -76,6 +76,10 @@ def _system(s: dict, conv: dict, policies: str = "") -> str:
             + f"\n\nCONVERSATION SO FAR:\n{transcript or '(none)'}")
 
 
+async def published_policies() -> str:
+    return "\n".join([f"- {x['title']}: {x['published_content'][:600]}" async for x in tdb.policies.find({"audience": "public", "published_version": {"$gt": 0}})])
+
+
 async def _conv(cid: str) -> dict:
     conv = await tdb.conversations.find_one({"_id": oid(cid)})
     if not conv:
@@ -126,8 +130,7 @@ async def _handle_tags(full: str, conv: dict, s: dict):
 async def send_message(cid: str, body: MessageIn):
     conv = await _conv(cid)
     s = await get_settings()
-    pols = "\n".join([f"- {x['title']}: {x['published_content'][:600]}" async for x in tdb.policies.find({"audience": "public", "published_version": {"$gt": 0}})])
-    chat = new_chat(_system(s, conv, pols), f"conv-{cid}")
+    chat = new_chat(_system(s, conv, await published_policies()), f"conv-{cid}")
     await tdb.conversations.update_one({"_id": conv["_id"]}, {"$push": {"messages": {"role": "user", "text": body.text, "at": now_iso()}}})
 
     async def gen():

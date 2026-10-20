@@ -5,6 +5,20 @@ import { Button } from "@/components/ui/button";
 import { DemoTag, Empty, Notice, PageHeader, Panel, StatusBadge, useLoad } from "@/components/admin/ui";
 import { api, errMsg, fmtDateTime, gbp } from "@/lib/api";
 
+function PhoneLine() {
+  const [v] = useLoad("/admin/voice/status");
+  if (!v) return null;
+  return (
+    <Notice testid="receptionist-phone-notice">
+      <PhoneCall className="mr-2 inline h-4 w-4" />
+      {v.configured && v.voice_number
+        ? <>Phone answering is <b>LIVE</b> on {v.voice_number}. Calls appear below with full transcripts.</>
+        : <>Phone answering is <b>NOT CONNECTED YET</b>. {v.configured ? "Add your Twilio number in Settings → Business (voice_number)." : "Twilio credentials are needed."}</>}
+      <span className="mt-1 block font-mono text-[11px]" data-testid="receptionist-webhook-url">Twilio “A call comes in” webhook (HTTP POST): {v.webhook_url}</span>
+    </Notice>
+  );
+}
+
 function Detail({ id, reload }) {
   const [d, setD] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -43,8 +57,8 @@ export default function Conversations() {
   const [sel, setSel] = useState(null);
   return (
     <div data-testid="admin-conversations-page">
-      <PageHeader eyebrow="AI receptionist" title="Conversations & call summaries" desc="Web chat is live now. Phone calls and WhatsApp plug into the same brain (knowledge base + pricing engine + availability) in Phase 3." />
-      <Notice testid="receptionist-phone-notice"><PhoneCall className="mr-2 inline h-4 w-4" />Telephone answering is <b>NOT CONNECTED YET</b> - it needs a voice provider (e.g. Vapi or Retell + a UK Twilio number). See the Proposal page.</Notice>
+      <PageHeader eyebrow="AI receptionist" title="Conversations & call summaries" desc="Web chat and phone calls share the same brain: your knowledge base, price list and policies." />
+      <PhoneLine />
       <div className="grid gap-6 lg:grid-cols-5">
         <Panel title="Recent" className="lg:col-span-2">
           <ul className="space-y-2" data-testid="conversation-list">

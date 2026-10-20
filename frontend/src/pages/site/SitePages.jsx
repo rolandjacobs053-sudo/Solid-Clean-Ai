@@ -8,15 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { api, errMsg, fmtDate, gbp } from "@/lib/api";
 import { DEFAULT_SLUG } from "@/lib/tenant";
-import { BookBtn, G, GOLD, QuoteBtn } from "@/pages/site/SiteLayout";
+import { BookBtn, G, GOLD } from "@/pages/site/SiteLayout";
 
 const IMG = {
+  standard: "https://images.unsplash.com/photo-1639173925921-5d5fd027713c?crop=entropy&cs=srgb&fm=jpg&q=80&w=1000",
   regular: "https://images.unsplash.com/photo-1639173925921-5d5fd027713c?crop=entropy&cs=srgb&fm=jpg&q=80&w=1000",
   end_of_tenancy: "https://images.unsplash.com/photo-1564078516393-cf04bd966897?crop=entropy&cs=srgb&fm=jpg&q=80&w=1000",
   carpet: "https://images.unsplash.com/photo-1558317374-067fb5f30001?crop=entropy&cs=srgb&fm=jpg&q=80&w=1000",
   commercial: "https://images.unsplash.com/photo-1662261896193-b4f8a02a9773?crop=entropy&cs=srgb&fm=jpg&q=80&w=1000",
 };
-const FALLBACK = { regular: "A fresh, clean home without the hassle - every corner taken care of.", commercial: "Hygienic, welcoming offices and workspaces.",
+const FALLBACK = { standard: "Routine cleaning to keep your home fresh and tidy.", regular: "A fresh, clean home without the hassle - every corner taken care of.", commercial: "Hygienic, welcoming offices and workspaces.",
   end_of_tenancy: "Thorough move-out cleaning for tenants, landlords and letting agents.", carpet: "Professional carpet cleaning for homes and workplaces." };
 const services = (cfg) => cfg.pricing.services.filter((s) => s.active !== false);
 const desc = (s) => s.description || FALLBACK[s.key] || "";
@@ -57,9 +58,9 @@ export function HomePage() {
             <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] rise" style={{ color: GOLD }}>Professional cleaning{b.service_areas_text ? ` · ${b.service_areas_text}` : ""}</p>
             <h1 className="mt-5 text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl rise rise-1" style={{ color: G }}>A spotless space,<br />booked in minutes.</h1>
             <p className="mt-6 max-w-lg text-base text-slate-600 sm:text-lg rise rise-2">See your exact price, choose a genuinely available appointment and pay securely online.</p>
-            <div className="mt-9 flex flex-wrap gap-3 rise rise-3"><BookBtn testid="hero-book-btn" /><QuoteBtn testid="hero-quote-btn" /></div>
+            <div className="mt-9 flex flex-wrap gap-3 rise rise-3"><BookBtn testid="hero-book-btn" /></div>
             <div className="mt-10 flex flex-wrap gap-6 text-sm text-slate-700">
-              {[[ShieldCheck, "Vetted cleaners"], [BadgeCheck, "Supplies included"], [CreditCard, "Secure Stripe payment"]].map(([I, t]) => <span key={t} className="flex items-center gap-2"><I className="h-4 w-4" style={{ color: GOLD }} />{t}</span>)}
+              {[[ShieldCheck, "Vetted cleaners"], [BadgeCheck, "Clear upfront prices"], [CreditCard, "Secure Stripe payment"]].map(([I, t]) => <span key={t} className="flex items-center gap-2"><I className="h-4 w-4" style={{ color: GOLD }} />{t}</span>)}
             </div>
           </div>
           <img src={IMG.end_of_tenancy} alt="Freshly cleaned room" className="aspect-[4/3] w-full rounded-[2rem] object-cover shadow-2xl" />
@@ -97,7 +98,7 @@ export function ServiceDetail() {
         <div className="space-y-6">
           <p className="text-lg text-slate-700">{desc(s)}</p>
           {block("What's included", s.scope_included)}{block("Not included", s.scope_excluded)}{block("Before we arrive", s.preparation)}
-          <div className="flex flex-wrap gap-3"><BookBtn testid="service-book-btn" /><QuoteBtn testid="service-quote-btn" /></div>
+          <div className="flex flex-wrap gap-3"><BookBtn testid="service-book-btn" /></div>
         </div>
         <img src={IMG[s.key] || IMG.regular} alt={s.name} className="aspect-[4/3] w-full rounded-3xl object-cover" />
       </div>
@@ -150,8 +151,8 @@ export function AboutPage() {
   const b = cfg.business;
   return (
     <Shell eyebrow="About us" title={`About ${b.name}`} testid="site-about">
-      <p className="max-w-3xl whitespace-pre-wrap text-lg leading-relaxed text-slate-700">{b.about_text || `${b.name} provides ${services(cfg).map((s) => s.name).join(", ")}. Our cleaners bring the necessary supplies and equipment, and every booking is confirmed with a reference and reminder.`}</p>
-      <div className="mt-8 flex gap-3"><BookBtn /><QuoteBtn /></div>
+      <p className="max-w-3xl whitespace-pre-wrap text-lg leading-relaxed text-slate-700">{b.about_text || `${b.name} provides ${services(cfg).map((s) => s.name).join(", ")}. Every booking is confirmed with a reference and a reminder before your appointment.`}</p>
+      <div className="mt-8 flex gap-3"><BookBtn /></div>
     </Shell>
   );
 }

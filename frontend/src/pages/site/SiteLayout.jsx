@@ -13,9 +13,6 @@ const LEGAL = [["/policies", "Company policies"], ["/privacy", "Privacy policy"]
 export const BookBtn = ({ children = "Book a Cleaning", className = "", testid = "book-cleaning-btn" }) => (
   <Link to="/quote" data-testid={testid} className={`inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold text-white transition-transform hover:-translate-y-0.5 ${className}`} style={{ background: G }}>{children}</Link>
 );
-export const QuoteBtn = ({ className = "", testid = "get-quote-btn" }) => (
-  <Link to="/quote" data-testid={testid} className={`inline-flex items-center justify-center rounded-full border-2 px-6 py-3 text-sm font-semibold transition-colors hover:bg-[#8F7E22]/10 ${className}`} style={{ borderColor: GOLD, color: G }}>Get a Quote</Link>
-);
 
 function Header({ b }) {
   const [open, setOpen] = useState(false);
@@ -36,7 +33,7 @@ function Header({ b }) {
       {open && (
         <nav className="space-y-1 border-t bg-white px-4 py-4 lg:hidden" data-testid="site-mobile-nav">
           {NAV.map(([to, t]) => <NavLink key={to} to={to} className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-50">{t}</NavLink>)}
-          <div className="flex gap-2 pt-2"><BookBtn className="flex-1" testid="mobile-book-btn" /><QuoteBtn className="flex-1" testid="mobile-quote-btn" /></div>
+          <div className="flex gap-2 pt-2"><BookBtn className="flex-1" testid="mobile-book-btn" /></div>
         </nav>
       )}
     </header>

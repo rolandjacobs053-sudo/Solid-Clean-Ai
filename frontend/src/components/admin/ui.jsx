@@ -37,7 +37,7 @@ const TONES = {
   completed: "bg-emerald-600 text-white", paid: "bg-emerald-100 text-emerald-800", lost: "bg-slate-200 text-slate-600",
   cancelled: "bg-slate-200 text-slate-600", abandoned: "bg-slate-100 text-slate-500", pending_payment: "bg-orange-100 text-orange-800",
   needs_human: "bg-red-100 text-red-700", needs_attention: "bg-red-100 text-red-700", needs_review: "bg-orange-100 text-orange-800",
-  opted_out: "bg-red-100 text-red-700", blocked_opt_out: "bg-red-100 text-red-700", simulated: "bg-violet-100 text-violet-800",
+  opted_out: "bg-red-100 text-red-700", blocked_opt_out: "bg-red-100 text-red-700", simulated: "bg-violet-100 text-violet-800", sent: "bg-emerald-100 text-emerald-800", failed: "bg-red-100 text-red-700", paused: "bg-orange-100 text-orange-800", no_address: "bg-slate-200 text-slate-600",
   scheduled: "bg-sky-100 text-sky-800", interested: "bg-teal-100 text-teal-800", meeting: "bg-emerald-100 text-emerald-800",
   won: "bg-emerald-600 text-white", contacted: "bg-amber-100 text-amber-800", draft_ready: "bg-amber-100 text-amber-800",
   approved: "bg-emerald-100 text-emerald-800", responded: "bg-emerald-100 text-emerald-800", resolved: "bg-slate-200 text-slate-600",

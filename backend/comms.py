@@ -1,20 +1,33 @@
-from core import company_name, now_iso, tdb
+from core import company_name, get_settings, now_iso, tdb
+from mailer import VALID_EMAIL, render_html, send_email
 
 
 async def is_suppressed(email: str) -> bool:
     return bool(email) and bool(await tdb.suppressions.find_one({"email": email.lower().strip()}))
 
 
+async def deliver_email(to: str, subject: str, body: str, link=None) -> str:
+    if not to or not VALID_EMAIL.match(to.strip()):
+        return "no_address"
+    s = await get_settings()
+    reply_to = next((e for e in (s["business"].get("contact_email"), s["business"].get("email")) if e and VALID_EMAIL.match(e)), "")
+    return await send_email(to=to.strip(), subject=subject, html=render_html(company_name(), body, link), from_name=company_name(), reply_to=reply_to)
+
+
 async def log_comm(to: str, channel: str, template: str, subject: str, body: str,
-                   kind: str = "transactional", lead_id=None, scheduled_for=None, extra=None):
+                   kind: str = "transactional", lead_id=None, scheduled_for=None, extra=None, link=None):
     status = "simulated"
     if kind in ("marketing", "follow_up") and await is_suppressed(to):
         status = "blocked_opt_out"
-    if scheduled_for:
+    elif scheduled_for:
         status = "scheduled"
+    elif channel == "email" and kind != "marketing":
+        status = await deliver_email(to, subject, body, link)
     doc = {"to": to, "channel": channel, "template": template, "subject": subject, "body": body,
            "kind": kind, "status": status, "lead_id": lead_id, "scheduled_for": scheduled_for,
-           "created_at": now_iso(), **(extra or {})}
+           "link": list(link) if link else None, "created_at": now_iso(), **(extra or {})}
+    if status in ("sent", "failed", "paused"):
+        doc["sent_at"] = now_iso()
     await tdb.communications.insert_one(doc)
     return status
 
@@ -47,8 +60,13 @@ async def upsert_lead(contact: dict, source: str, event_text: str, extra=None) -
     return lead_id
 
 
-def quote_email(name: str, quote: dict, link: str) -> str:
+def quote_email(name: str, quote: dict) -> str:
     lines = "\n".join(f"  - {l['label']}: £{l['amount']:.2f}" for l in quote["lines"])
     return (f"Hi {name},\n\nThank you for your enquiry with {company_name()}. Here is your quotation for "
             f"{quote['service_name']}:\n{lines}\n  Total: £{quote['total']:.2f}\n\n"
-            f"Book an available slot here: {link}\n\nKind regards,\n{company_name()}")
+            f"Use the button below to choose an available date and time and pay securely to confirm.\n\nKind regards,\n{company_name()}")
+
+
+def booking_link(request, slug: str, quote_id: str) -> tuple:
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    return ("View quote & book", f"https://{host}/c/{slug}/quote?q={quote_id}")

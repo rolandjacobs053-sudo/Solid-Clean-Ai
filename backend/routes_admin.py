@@ -143,8 +143,10 @@ async def patch_lead(lead_id: str, body: LeadPatch):
 
 
 @router.get("/bookings")
-async def list_bookings(status: str = "", ctx=Depends(require_admin)):
+async def list_bookings(status: str = "", date_from: str = "", date_to: str = "", ctx=Depends(require_admin)):
     query = {"status": status} if status else {"status": {"$nin": ["abandoned"]}}
+    if date_from and date_to:
+        query["date"] = {"$gte": date_from, "$lte": date_to}
     if ctx["user"]["role"] == "staff":
         query["assigned_to"] = str(ctx["user"]["_id"])
     return outs(await tdb.bookings.find(query).sort([("date", -1), ("slot", 1)]).to_list(500))

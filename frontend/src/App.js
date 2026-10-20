@@ -16,6 +16,7 @@ import AdminLayout from "@/pages/admin/AdminLayout";
 import Overview from "@/pages/admin/Overview";
 import Leads from "@/pages/admin/Leads";
 import Bookings from "@/pages/admin/Bookings";
+import Schedule from "@/pages/admin/Schedule";
 import Conversations from "@/pages/admin/Conversations";
 import Outreach from "@/pages/admin/Outreach";
 import Reviews from "@/pages/admin/Reviews";
@@ -66,7 +67,7 @@ const CompanyArea = () => {
   if (user === null) return <Loading />;
   if (!user) return <Navigate to="/admin/login" replace />;
   if (user.role === "platform_admin") return <Navigate to="/platform" replace />;
-  if (user.role === "staff" && !/^\/admin\/(bookings|policies)/.test(loc.pathname)) return <Navigate to="/admin/bookings" replace />;
+  if (user.role === "staff" && !/^\/admin\/(bookings|schedule|policies)/.test(loc.pathname)) return <Navigate to="/admin/bookings" replace />;
   if (!user.company.access.ok && loc.pathname !== "/admin/billing") return <Navigate to="/admin/billing" replace />;
   return <AdminLayout />;
 };
@@ -117,6 +118,7 @@ function App() {
               <Route index element={<Overview />} />
               <Route path="leads" element={<Leads />} />
               <Route path="bookings" element={<Bookings />} />
+              <Route path="schedule" element={<Schedule />} />
               <Route path="receptionist" element={<Conversations />} />
               <Route path="outreach" element={<Outreach />} />
               <Route path="reviews" element={<Reviews />} />
