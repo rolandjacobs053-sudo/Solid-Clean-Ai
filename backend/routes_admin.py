@@ -1,7 +1,9 @@
+from datetime import datetime
 from typing import Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ai import ai_complete
 from automations import run_automations
@@ -34,6 +36,11 @@ class LeadIn(BaseModel):
 class BookingPatch(BaseModel):
     status: Optional[str] = None
     assigned_to: Optional[str] = None
+
+
+class RefundIn(BaseModel):
+    amount: float = Field(ge=0)
+    note: str = Field("", max_length=500)
 
 
 class SettingsIn(BaseModel):
@@ -176,6 +183,81 @@ async def balance_link(booking_id: str, request: Request):
     return {"url": session.url, "email_status": status}
 
 
+def refund_rule(b: dict) -> dict:
+    start = datetime.fromisoformat(f"{b['date']}T{b['slot']}").replace(tzinfo=ZoneInfo("Europe/London"))
+    hours = max((start - now()).total_seconds() / 3600, 0)
+    pct = 100 if hours >= 168 else 50 if hours >= 48 else 0
+    paid = b["deposit_amount"] if b.get("payment_status") == "deposit_paid" else b["total"]
+    tip = float(b.get("tip") or 0)
+    return {"notice_hours": round(hours, 1), "rule_percent": pct, "service_paid": round(paid, 2), "tip": tip,
+            "paid": round(paid + tip, 2), "suggested": round(paid * pct / 100 + tip, 2)}
+
+
+async def _paid_booking(booking_id: str) -> dict:
+    b = await tdb.bookings.find_one({"_id": oid(booking_id)})
+    if not b or b.get("status") != "confirmed" or b.get("payment_status") not in ("paid", "deposit_paid"):
+        raise HTTPException(400, "Only confirmed, paid bookings can be cancelled with a refund")
+    return b
+
+
+@router.get("/bookings/{booking_id}/refund-quote", dependencies=[Depends(require_owner)])
+async def refund_quote(booking_id: str):
+    return refund_rule(await _paid_booking(booking_id))
+
+
+@router.post("/bookings/{booking_id}/cancel-refund", dependencies=[Depends(require_owner)])
+async def cancel_refund(booking_id: str, body: RefundIn):
+    b = await _paid_booking(booking_id)
+    rule = refund_rule(b)
+    if body.amount > rule["paid"]:
+        raise HTTPException(400, f"The refund can't be more than the £{rule['paid']:.2f} the customer paid")
+    refund = {**rule, "amount": round(body.amount, 2), "note": body.note.strip(), "status": "to_issue_in_stripe",
+              "recorded_at": now_iso(), "recorded_by": current_actor.get()}
+    res = await tdb.bookings.update_one({"_id": b["_id"], "status": "confirmed"}, {"$set": {"status": "cancelled", "refund": refund, "updated_at": now_iso()}})
+    if not res.modified_count:
+        raise HTTPException(409, "This booking has already changed - please refresh")
+    await _cancel_effects(b, refund)
+    await audit("booking.cancel_refund", f"{b.get('reference') or booking_id} refund £{refund['amount']:.2f}")
+    return refund
+
+
+@router.post("/bookings/{booking_id}/tip-request", dependencies=[Depends(require_owner)])
+async def tip_request(booking_id: str, request: Request):
+    import secrets
+    b = await tdb.bookings.find_one({"_id": oid(booking_id)})
+    if not b or b.get("status") != "completed":
+        raise HTTPException(400, "Tip requests can only be sent for completed jobs")
+    token = b.get("tip_token") or secrets.token_urlsafe(16)
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    url = f"https://{host}/tip/{booking_id}?t={token}"
+    c = b["customer"]
+    status = await log_comm(c["email"], "email", "tip_request", f"Happy with your clean? - {company_name()}",
+                            f"Hi {c['name']}, thank you for choosing {company_name()}. If you were happy with your {b['service_name']} on {fmt_date(b['date'])}, "
+                            "you can leave an optional tip for your cleaning team using the secure link below. Thank you!",
+                            lead_id=b["lead_id"], link=("Leave a tip", url))
+    await tdb.bookings.update_one({"_id": b["_id"]}, {"$set": {"tip_token": token, "tip_request_sent_at": now_iso()}})
+    await add_event(b["lead_id"], "job", f"Tip request sent for booking {b.get('reference')}")
+    await audit("booking.tip_request", b.get("reference") or booking_id)
+    return {"url": url, "email_status": status}
+
+
+async def _cancel_effects(b: dict, refund: Optional[dict] = None):
+    c, when = b["customer"], f"{fmt_date(b['date'])} {b['slot']}"
+    if refund is None:
+        event = f"Booking cancelled: {when}. Any refund must be approved and issued manually in Stripe."
+        msg = "We'll be in touch about any refund in line with our cancellation policy."
+    else:
+        event = (f"Booking cancelled: {when}. Refund recorded: £{refund['amount']:.2f} ({refund['rule_percent']}% rule, "
+                 f"{refund['notice_hours']}h notice) - issue it manually in Stripe.")
+        msg = (f"In line with our Terms and Conditions, a refund of £{refund['amount']:.2f} will be made to your original payment method." if refund["amount"] > 0
+               else "In line with our Terms and Conditions, this cancellation is not eligible for a refund.")
+    await add_event(b["lead_id"], "job", event)
+    await log_comm(c["email"], "email", "booking_cancelled", "Your booking has been cancelled",
+                   f"Hi {c['name']}, your booking for {when} has been cancelled. {msg}", lead_id=b["lead_id"])
+    await tdb.communications.update_many({"lead_id": b["lead_id"], "status": "scheduled", "template": "appointment_reminder"},
+                                        {"$set": {"status": "cancelled"}})
+
+
 @router.patch("/bookings/{booking_id}")
 async def patch_booking(booking_id: str, body: BookingPatch, ctx=Depends(require_admin)):
     b = await tdb.bookings.find_one({"_id": oid(booking_id)})
@@ -205,12 +287,7 @@ async def patch_booking(booking_id: str, body: BookingPatch, ctx=Depends(require
                        + ". If anything wasn't right, just reply and we'll put it right.",
                        kind="follow_up", lead_id=b["lead_id"])
     elif body.status == "cancelled":
-        await add_event(b["lead_id"], "job", f"Booking cancelled: {when}. Any refund must be approved and issued manually in Stripe.")
-        await log_comm(c["email"], "email", "booking_cancelled", "Your booking has been cancelled",
-                       f"Hi {c['name']}, your booking for {when} has been cancelled. We'll be in touch about any refund in line with our cancellation policy.",
-                       lead_id=b["lead_id"])
-        await tdb.communications.update_many({"lead_id": b["lead_id"], "status": "scheduled", "template": "appointment_reminder"},
-                                            {"$set": {"status": "cancelled"}})
+        await _cancel_effects(b)
     return {"ok": True}
 
 

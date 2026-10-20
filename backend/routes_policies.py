@@ -76,8 +76,18 @@ async def publish(key: str, body: PublishIn):
     v = p["published_version"] + 1
     version = {"version": v, "content": p["draft_content"], "title": p["title"], "effective_date": p.get("effective_date") or now_iso()[:10],
                "published_at": now_iso(), "published_by": current_actor.get()}
-    await tdb.policies.update_one({"key": key}, {"$set": {"published_version": v, "published_content": p["draft_content"], "needs_review": False,
+    await tdb.policies.update_one({"key": key}, {"$set": {"published_version": v, "published_content": p["draft_content"], "needs_review": False, "unpublished": False,
                                                           "published_at": version["published_at"], "effective_date": version["effective_date"]},
                                                  "$push": {"versions": version}})
     await audit("policy.publish", f"{key} v{v}")
     return {"version": v}
+
+
+@router.post("/{key}/unpublish", dependencies=[Depends(require_owner)])
+async def unpublish(key: str, body: PublishIn):
+    p = await _get(key)
+    if not body.confirm:
+        raise HTTPException(400, "Confirmation required")
+    await tdb.policies.update_one({"_id": p["_id"]}, {"$set": {"unpublished": True, "require_acceptance": False, "unpublished_at": now_iso()}})
+    await audit("policy.unpublish", f"{key} v{p['published_version']}")
+    return {"ok": True}

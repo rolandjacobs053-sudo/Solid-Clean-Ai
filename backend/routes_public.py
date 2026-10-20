@@ -93,12 +93,20 @@ class BookingIn(QuoteSave):
     access_notes: str = ""
     access: AccessIn = AccessIn()
     accepted_policies: dict = {}
+    pay_terms_accepted: bool = False
+    tip: float = Field(0, ge=0, le=500)
     quote_id: Optional[str] = None
     origin_url: str
 
 
 class OptOut(BaseModel):
     email: str = Field(pattern=EMAIL_RE)
+
+
+class TipIn(BaseModel):
+    t: str
+    amount: float = Field(ge=1, le=500)
+    origin_url: str
 
 
 def _source(s: str) -> str:
@@ -144,7 +152,7 @@ async def public_config(slug: str):
     return {"pricing": s["pricing"], "availability": s["availability"], "knowledge_base": s["knowledge_base"],
             "ai_receptionist": company.get("comped") or "ai_receptionist" in feats,
             "policies": [{k: p.get(k) for k in ("key", "title", "published_version", "published_content", "effective_date", "require_acceptance")}
-                         async for p in tdb.policies.find({"audience": "public", "published_version": {"$gt": 0}}).sort("order", 1)],
+                         async for p in tdb.policies.find({"audience": "public", "published_version": {"$gt": 0}, "unpublished": {"$ne": True}}).sort("order", 1)],
             "business": {k: s["business"].get(k) for k in ("name", "website", "online_payments", "phone", "logo_url", "brand_primary", "brand_accent", "about_text", "contact_email", "service_areas_text", "business_hours", "payment_mode")}}
 
 
@@ -223,9 +231,11 @@ async def create_booking(body: BookingIn):
     s = await get_settings()
     q = {**body.quote.model_dump(), "date": body.date}
     result = compute_quote(s["pricing"], q)
-    required = {p["key"]: p["published_version"] async for p in tdb.policies.find({"require_acceptance": True, "published_version": {"$gt": 0}})}
+    required = {p["key"]: p["published_version"] async for p in tdb.policies.find({"require_acceptance": True, "published_version": {"$gt": 0}, "unpublished": {"$ne": True}})}
     if any(body.accepted_policies.get(k) != v for k, v in required.items()):
         raise HTTPException(409, "Please review and accept the current booking terms and policies.")
+    if not body.pay_terms_accepted:
+        raise HTTPException(409, "Please confirm you accept the Terms and Conditions before paying.")
     if result["status"] != "ok":
         raise HTTPException(422, "This booking needs a quick review by our team: " + " ".join(result["reasons"]))
     if len(q["address"].strip()) < 5:
@@ -247,8 +257,8 @@ async def create_booking(body: BookingIn):
         await tdb.quotes.update_one({"_id": oid(quote_id)}, {"$set": {"lead_id": lead_id, "input": q, "result": result, "total": result["total"]}})
     else:
         quote_id = await store_quote(q, result, lead_id, lead["source"], status="booking_started")
-    charge = deposit_for(s, result["total"])
-    booking = {"lead_id": lead_id, "quote_id": quote_id, "customer": {k: contact[k] for k in ("name", "email", "phone")},
+    charge, tip = deposit_for(s, result["total"]), round(body.tip, 2)
+    booking = {"tip": tip, "pay_terms_confirmed_at": now_iso(), "lead_id": lead_id, "quote_id": quote_id, "customer": {k: contact[k] for k in ("name", "email", "phone")},
                "postcode": q["postcode"].upper(), "address": q["address"].strip(), "service": q["service"], "service_name": result["service_name"], "input": q,
                "lines": result["lines"], "total": result["total"], "deposit_amount": charge, "balance_due": round(result["total"] - charge, 2),
                "payment_mode": s["business"].get("payment_mode", "full_upfront"), "date": body.date, "slot": body.slot,
@@ -265,14 +275,16 @@ async def create_booking(body: BookingIn):
     kwargs = dict(
         mode="payment", customer_email=body.contact.email, metadata={"booking_id": booking_id},
         line_items=[{"quantity": 1, "price_data": {"currency": "gbp", "unit_amount": int(round(charge * 100)), "tax_behavior": "inclusive",
-                     "product_data": {"name": ("50% deposit - " if charge < result["total"] else "") + f"{result['service_name']} - {fmt_date(body.date)} {body.slot}"}}}],
+                     "product_data": {"name": ("50% deposit - " if charge < result["total"] else "") + f"{result['service_name']} - {fmt_date(body.date)} {body.slot}"}}}]
+        + ([{"quantity": 1, "price_data": {"currency": "gbp", "unit_amount": int(round(tip * 100)), "tax_behavior": "inclusive",
+                                           "product_data": {"name": "Tip for your cleaning team"}}}] if tip > 0 else []),
         success_url=f"{origin}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{origin}/payment/cancel?booking_id={booking_id}")
     try:
         session = stripe.checkout.Session.create(**kwargs, automatic_tax={"enabled": True}, billing_address_collection="required")
     except stripe.error.StripeError:
         session = stripe.checkout.Session.create(**kwargs)
-    await tdb.payment_transactions.insert_one({"session_id": session.id, "booking_id": booking_id, "amount": float(charge), "kind": "deposit" if charge < result["total"] else "booking",
+    await tdb.payment_transactions.insert_one({"session_id": session.id, "booking_id": booking_id, "amount": float(round(charge + tip, 2)), "tip": tip, "kind": "deposit" if charge < result["total"] else "booking",
                                               "currency": "gbp", "status": "initiated", "payment_status": "pending",
                                               "created_at": now_iso(), "updated_at": now_iso()})
     await tdb.bookings.update_one({"_id": oid(booking_id)}, {"$set": {"session_id": session.id}})
@@ -299,7 +311,7 @@ async def finalize_booking(booking_id: str, paid: bool = True):
     if b.get("promo_code"):
         await tdb.settings.update_one({"pricing.promo_codes.code": b["promo_code"]}, {"$inc": {"pricing.promo_codes.$.uses": 1}})
     pay_text = (f"Deposit of £{b['deposit_amount']:.2f} received. The remaining balance of £{b['balance_due']:.2f} is due immediately after the clean." if deposit
-                else f"Payment of £{b['total']:.2f} received." if paid else f"Amount due: £{b['total']:.2f}. {s['business'].get('payment_instructions', '')}")
+                else f"Payment of £{b['total'] + (b.get('tip') or 0):.2f} received" + (f" (including a £{b['tip']:.2f} tip - thank you!)." if b.get("tip") else ".") if paid else f"Amount due: £{b['total']:.2f}. {s['business'].get('payment_instructions', '')}")
     await tdb.leads.update_one({"_id": oid(b["lead_id"])}, {"$set": {"status": "booked"}})
     await tdb.quotes.update_one({"_id": oid(b["quote_id"])}, {"$set": {"status": "accepted"}})
     await add_event(b["lead_id"], "booking", f"Booking confirmed ({'deposit paid' if deposit else 'paid'}): {b['service_name']} {when} (£{b['total']:.2f})")
@@ -326,6 +338,49 @@ async def settle_balance(tx: dict):
         await add_event(b["lead_id"], "payment", f"Balance of £{tx['amount']:.2f} paid for booking {b.get('reference')}")
 
 
+async def settle_tip(tx: dict):
+    res = await tdb.payment_transactions.update_one({"session_id": tx["session_id"], "settled": {"$ne": True}}, {"$set": {"settled": True}})
+    if res.modified_count:
+        await tdb.bookings.update_one({"_id": oid(tx["booking_id"])}, {"$inc": {"after_tip": tx["amount"]}, "$set": {"after_tip_paid_at": now_iso()}})
+        b = await tdb.bookings.find_one({"_id": oid(tx["booking_id"])})
+        await add_event(b["lead_id"], "payment", f"Tip of £{tx['amount']:.2f} received for booking {b.get('reference')}")
+        await notify_owner(await get_settings(), f"Tip received - £{tx['amount']:.2f}",
+                           f"{b['customer']['name']} left a £{tx['amount']:.2f} tip for the {b['service_name']} on {fmt_date(b['date'])} (ref {b.get('reference')}, cleaner: {b.get('assigned_name') or 'unassigned'}).", b["lead_id"])
+
+
+async def settle_tx(tx: dict, booking_id: str):
+    kind = tx.get("kind")
+    await (settle_balance(tx) if kind == "balance" else settle_tip(tx) if kind == "tip" else finalize_booking(booking_id))
+
+
+async def _tip_booking(booking_id: str, t: str) -> dict:
+    b = await tdb.bookings.find_one({"_id": oid(booking_id)})
+    if not b or b.get("status") != "completed" or not b.get("tip_token") or not secrets.compare_digest(b["tip_token"], t):
+        raise HTTPException(404, "This tip link is not valid")
+    return b
+
+
+@public.get("/tips/{booking_id}")
+async def tip_info(booking_id: str, t: str):
+    b = await _tip_booking(booking_id, t)
+    return {"service_name": b["service_name"], "date": b["date"], "first_name": b["customer"]["name"].split()[0],
+            "cleaner": (b.get("assigned_name") or "").split(" ")[0], "tips_received": b.get("after_tip") or 0}
+
+
+@public.post("/tips/{booking_id}")
+async def tip_checkout(booking_id: str, body: TipIn):
+    b = await _tip_booking(booking_id, body.t)
+    amount, origin = round(body.amount, 2), body.origin_url.rstrip("/")
+    session = stripe.checkout.Session.create(
+        mode="payment", customer_email=b["customer"]["email"], metadata={"booking_id": booking_id, "kind": "tip"},
+        line_items=[{"quantity": 1, "price_data": {"currency": "gbp", "unit_amount": int(round(amount * 100)),
+                     "product_data": {"name": f"Tip for your cleaning team - {b['service_name']} {fmt_date(b['date'])}"}}}],
+        success_url=f"{origin}/payment/success?session_id={{CHECKOUT_SESSION_ID}}", cancel_url=f"{origin}/tip/{booking_id}?t={body.t}")
+    await tdb.payment_transactions.insert_one({"session_id": session.id, "booking_id": booking_id, "amount": float(amount), "kind": "tip",
+                                              "currency": "gbp", "status": "initiated", "payment_status": "pending", "created_at": now_iso(), "updated_at": now_iso()})
+    return {"checkout_url": session.url}
+
+
 @router.get("/payments/status/{session_id}")
 async def payment_status(session_id: str):
     tx = await db.payment_transactions.find_one({"session_id": session_id, "kind": {"$ne": "subscription"}})
@@ -342,7 +397,7 @@ async def payment_status(session_id: str):
         except stripe.error.StripeError:
             pass
     if tx["payment_status"] == "paid":
-        await (settle_balance(tx) if tx.get("kind") == "balance" else finalize_booking(tx["booking_id"]))
+        await settle_tx(tx, tx["booking_id"])
     b = await tdb.bookings.find_one({"_id": oid(tx["booking_id"])})
     return {"session_id": session_id, "status": tx["status"], "payment_status": tx["payment_status"], "kind": tx.get("kind", "booking"), "amount": tx["amount"],
             "booking": {"service_name": b["service_name"], "date": b["date"], "slot": b["slot"], "total": b["total"], "reference": b.get("reference")}}
@@ -366,7 +421,7 @@ async def stripe_webhook(request: Request):
         await tdb.payment_transactions.update_one({"session_id": obj["id"], "payment_status": {"$ne": "paid"}},
                                                  {"$set": {"status": "completed", "payment_status": "paid", "updated_at": now_iso()}})
         tx = await tdb.payment_transactions.find_one({"session_id": obj["id"]})
-        await (settle_balance(tx) if tx.get("kind") == "balance" else finalize_booking(obj["metadata"]["booking_id"]))
+        await settle_tx(tx, obj["metadata"]["booking_id"])
     elif kind == "checkout.session.expired":
         await tdb.payment_transactions.update_one({"session_id": obj["id"]}, {"$set": {"status": "expired", "payment_status": "expired"}})
         await tdb.bookings.update_one({"session_id": obj["id"], "status": "pending_payment"}, {"$set": {"status": "abandoned"}})

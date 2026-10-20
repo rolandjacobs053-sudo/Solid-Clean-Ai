@@ -34,6 +34,8 @@ export default function QuotePage() {
   const [photos, setPhotos] = useState([]);
   const [busy, setBusy] = useState(false);
   const [accepted, setAccepted] = useState({});
+  const [tip, setTip] = useState(0);
+  const [payOk, setPayOk] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function QuotePage() {
     try {
       if (mode === "book") {
         const accepted_policies = Object.fromEntries(required.map((x) => [x.key, x.published_version]));
-        const { data } = await api.post(`${pub}/bookings`, { quote: form, contact, date: format(date, "yyyy-MM-dd"), slot, access, photos: photoRefs, source: getSource(), quote_id: quoteId, accepted_policies, origin_url: `${window.location.origin}${base}` });
+        const { data } = await api.post(`${pub}/bookings`, { quote: form, contact, date: format(date, "yyyy-MM-dd"), slot, access, photos: photoRefs, source: getSource(), quote_id: quoteId, accepted_policies, pay_terms_accepted: payOk, tip, origin_url: `${window.location.origin}${base}` });
         if (data.confirmed) { toast.success(`Booking confirmed. ${data.payment_instructions || ""}`, { duration: 10000 }); setBusy(false); setStep(0); return; }
         window.location.href = data.checkout_url;
         return;
@@ -91,12 +93,12 @@ export default function QuotePage() {
           {step === 4 && <StepAccess access={access} setAccess={setAccess} />}
           {step === 5 && <StepContact config={config} needsReview={needsReview} date={date} setDate={setDate} slot={slot} setSlot={setSlot} contact={contact} setContact={setContact} form={form} set={set} preview={preview} postcodeOk={postcodeOk} />}
           {step === 6 && <StepTerms policies={policies} base={base} accepted={accepted} setAccepted={setAccepted} needsReview={needsReview} />}
-          {step === 7 && <StepReview p={p} svc={svc} form={form} access={access} photos={photos} date={date} slot={slot} contact={contact} preview={preview} policies={policies} needsReview={needsReview} deposit={deposit} />}
+          {step === 7 && <StepReview p={p} svc={svc} form={form} access={access} photos={photos} date={date} slot={slot} contact={contact} preview={preview} policies={policies} needsReview={needsReview} deposit={deposit} tip={tip} setTip={setTip} payOk={payOk} setPayOk={setPayOk} base={base} />}
           <StepNav prefix="quote" step={step} last={7} setStep={setStep} canNext={canNext} hint={hints[step]} nextLabel={step === 0 && commercial ? "Continue to free site walkthrough" : step === 2 && !photos.length ? "Skip photos" : "Continue"}
             onNext={step === 0 && commercial ? () => navigate("/commercial-cleaning/request") : undefined}>
             {step === 7 && !needsReview && (
-              <Button disabled={busy || !termsOk} onClick={() => submit("book")} className="rounded-full bg-[#023F00] px-7 text-white hover:bg-[#8F7E22]" data-testid="quote-book-now-btn">
-                {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{deposit < preview?.total ? `Pay ${gbp(deposit)} deposit & confirm` : `Pay ${gbp(preview?.total)} & confirm`}
+              <Button disabled={busy || !termsOk || !payOk} onClick={() => submit("book")} className="rounded-full bg-[#023F00] px-7 text-white hover:bg-[#8F7E22]" data-testid="quote-book-now-btn">
+                {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{deposit < preview?.total ? `Pay ${gbp(deposit + tip)} deposit & confirm` : `Pay ${gbp((preview?.total || 0) + tip)} & confirm`}
               </Button>
             )}
             {step === 7 && <Button variant="outline" disabled={busy || !contactOk} onClick={() => submit("quote")} className="rounded-full" data-testid="quote-email-quote-btn">{needsReview ? "Send enquiry" : "Just email me this quote"}</Button>}

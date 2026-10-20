@@ -9,6 +9,7 @@ import { BookingHeader } from "@/components/site/SiteHeader";
 import { ChatWidget } from "@/components/site/ChatWidget";
 import QuotePage from "@/pages/QuotePage";
 import PaymentResult from "@/pages/PaymentResult";
+import TipPage from "@/pages/site/TipPage";
 import Unsubscribe from "@/pages/Unsubscribe";
 import AdminLogin from "@/pages/AdminLogin";
 import Signup from "@/pages/Signup";
@@ -98,6 +99,7 @@ function App() {
               <Route path="/quote" element={<QuotePage />} />
               <Route path="/book" element={<Navigate to="/quote" replace />} />
               <Route path="/payment/:result" element={<PaymentResult />} />
+              <Route path="/tip/:bookingId" element={<TipPage />} />
               <Route path="/unsubscribe" element={<Unsubscribe />} />
               <Route path="/faq" element={<FaqPage />} />
               <Route path="/areas" element={<AreasPage />} />

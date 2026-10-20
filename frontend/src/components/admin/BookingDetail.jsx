@@ -4,12 +4,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { StatusBadge } from "@/components/admin/ui";
+import { RefundButton } from "@/components/admin/RefundDialog";
 import { useAuth } from "@/context/AuthContext";
 import { api, errMsg, fmtDate, gbp } from "@/lib/api";
 
 const ACCESS = { customer_present: "Customer will be present", authorised_person: "Authorised person will give access", estate_agency: "Keys collected from estate agency", other: "Other arrangement" };
 const nice = (v) => (v ? String(v).replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase()) : "");
-const LABELS = { flat: "Flat / Apartment", good: "Well maintained", poor: "Needs extra attention", very_poor: "Very heavy soiling", part: "Part furnished", hard: "Mostly hard floors", carpet: "Mostly carpet", mixed: "Mix of carpet and hard floors", yes: "Pets live here", recent: "Pets lived here recently", no: "No pets", terms: "Company Policy (booking terms)" };
+const LABELS = { flat: "Flat / Apartment", good: "Well maintained", poor: "Needs extra attention", very_poor: "Very heavy soiling", part: "Part furnished", hard: "Mostly hard floors", carpet: "Mostly carpet", mixed: "Mix of carpet and hard floors", yes: "Pets live here", recent: "Pets lived here recently", no: "No pets", terms: "Terms and Conditions" };
 const lab = (v) => LABELS[v] || nice(v);
 
 export function AuthImg({ id, className }) {
@@ -54,6 +55,24 @@ function JobPhotos({ b, photos, reload }) {
   ));
 }
 
+function TipRequest({ b }) {
+  const [sent, setSent] = useState(b.tip_request_sent_at);
+  const [busy, setBusy] = useState(false);
+  const send = async () => {
+    setBusy(true);
+    try { const { data } = await api.post(`/admin/bookings/${b.id}/tip-request`); setSent(new Date().toISOString()); toast.success(data.email_status === "sent" ? "Tip request emailed to the customer" : "Tip request created"); } catch (e) { toast.error(errMsg(e)); }
+    setBusy(false);
+  };
+  return (
+    <Sec title="Tips" testid="booking-detail-tips">
+      <R k="Tip added at booking" v={gbp(b.tip || 0)} />
+      <R k="Tips received after the clean" v={<span data-testid="booking-detail-after-tip">{gbp(b.after_tip || 0)}</span>} />
+      {sent && <p className="text-xs text-slate-500" data-testid="booking-tip-request-sent">Tip request sent {new Date(sent).toLocaleString("en-GB")}</p>}
+      <Button size="sm" variant="outline" className="mt-2" disabled={busy} onClick={send} data-testid="booking-send-tip-request-btn">{busy && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}{sent ? "Send tip request again" : "Send tip request"}</Button>
+    </Sec>
+  );
+}
+
 function Detail({ b, reload }) {
   const { user } = useAuth();
   const [photos, setPhotos] = useState(null);
@@ -84,9 +103,20 @@ function Detail({ b, reload }) {
       <Sec title={`Service & price - ${b.service_name}`} testid="booking-detail-price">
         {(b.lines || b.result?.lines || []).map((l) => <R key={l.label} k={l.label} v={gbp(l.amount)} />)}
         <R k="Total" v={gbp(b.total)} />
+        {b.tip > 0 && <R k="Tip for the team" v={<span data-testid="booking-detail-tip">{gbp(b.tip)}</span>} />}
         {b.deposit_amount != null && b.deposit_amount < b.total && <><R k="Deposit (50%)" v={gbp(b.deposit_amount)} /><R k="Balance due" v={gbp(b.balance_due)} /></>}
         {user.role === "owner" && b.payment_status === "deposit_paid" && b.balance_due > 0 && <Button size="sm" className="mt-2 bg-[#023F00] text-white hover:bg-[#8F7E22]" disabled={busy} onClick={sendBalance} data-testid="booking-send-balance-btn">Email balance payment link</Button>}
+        <div className="mt-2"><RefundButton b={b} onDone={reload} /></div>
       </Sec>
+      {user.role === "owner" && b.status === "completed" && <TipRequest b={b} />}
+      {b.refund && (
+        <Sec title="Cancellation & refund" testid="booking-detail-refund">
+          <R k="Refund to issue in Stripe" v={<span className="font-mono" data-testid="booking-detail-refund-amount">{gbp(b.refund.amount)}</span>} />
+          <R k="Rule applied" v={`${b.refund.rule_percent}% · ${b.refund.notice_hours} h notice (suggested ${gbp(b.refund.suggested)})`} />
+          {b.refund.note && <p className="mt-1 rounded-lg bg-slate-50 p-2 text-sm">{b.refund.note}</p>}
+          <p className="mt-1 text-xs text-slate-400">Recorded {new Date(b.refund.recorded_at).toLocaleString("en-GB")}</p>
+        </Sec>
+      )}
       <Sec title="Access & keys" testid="booking-detail-access">
         <R k="Method" v={ACCESS[a.method] || "-"} />
         <R k="Person" v={a.method === "authorised_person" && `${a.person_name} · ${a.person_phone}`} />

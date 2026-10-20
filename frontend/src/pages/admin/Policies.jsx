@@ -13,7 +13,10 @@ import { api, errMsg, fmtDate, fmtDateTime } from "@/lib/api";
 function Editor({ p, owner, reload }) {
   const [d, setD] = useState(p);
   const [confirm, setConfirm] = useState(false);
-  useEffect(() => { setD(p); setConfirm(false); }, [p]);
+  const [confirmUn, setConfirmUn] = useState(false);
+  useEffect(() => { setD(p); setConfirm(false); setConfirmUn(false); }, [p]);
+  const unpublish = async () => { try { await api.post(`/admin/policies/${p.key}/unpublish`, { confirm: true }); toast.success("Removed from the website"); reload(); } catch (e) { toast.error(errMsg(e)); } };
+  const live = p.published_version > 0 && !p.unpublished;
   const save = async () => { try { await api.put(`/admin/policies/${p.key}`, { title: d.title, draft_content: d.draft_content, needs_review: d.needs_review, effective_date: d.effective_date, require_acceptance: d.require_acceptance }); toast.success("Draft saved"); reload(); } catch (e) { toast.error(errMsg(e)); } };
   const publish = async () => { try { await save(); const { data } = await api.post(`/admin/policies/${p.key}/publish`, { confirm: true }); toast.success(`Published version ${data.version}`); reload(); } catch (e) { toast.error(errMsg(e)); } };
   const markers = (d.draft_content.match(/\[REVIEW REQUIRED[^\]]*\]/g) || []).length;
@@ -21,7 +24,7 @@ function Editor({ p, owner, reload }) {
     <div className="space-y-4" data-testid="policy-editor">
       <div className="flex flex-wrap items-center gap-3">
         <Input value={d.title} disabled={!owner} onChange={(e) => setD({ ...d, title: e.target.value })} className="max-w-md font-display font-semibold" data-testid="policy-title-input" />
-        <StatusBadge status={p.published_version ? `published_v${p.published_version}` : "draft"} />
+        <StatusBadge status={p.unpublished ? "unpublished" : p.published_version ? `published_v${p.published_version}` : "draft"} testid="policy-status-badge" />
         {d.needs_review && <span className="flex items-center gap-1 text-xs text-amber-700"><AlertTriangle className="h-3.5 w-3.5" />Needs your review</span>}
       </div>
       <Textarea rows={14} value={d.draft_content} disabled={!owner} onChange={(e) => setD({ ...d, draft_content: e.target.value })} data-testid="policy-content-input" />
@@ -36,6 +39,9 @@ function Editor({ p, owner, reload }) {
           {confirm
             ? <Button onClick={publish} className="bg-teal-600 hover:bg-teal-700" data-testid="policy-publish-confirm-btn">Confirm: publish as version {p.published_version + 1}</Button>
             : <Button onClick={() => setConfirm(true)} className="bg-slate-900 hover:bg-teal-700" data-testid="policy-publish-btn">Publish…</Button>}
+          {live && (confirmUn
+            ? <Button variant="destructive" onClick={unpublish} data-testid="policy-unpublish-confirm-btn">Confirm: remove from website</Button>
+            : <Button variant="outline" onClick={() => setConfirmUn(true)} data-testid="policy-unpublish-btn">Unpublish…</Button>)}
         </div>
       )}
       <p className="text-xs text-slate-500">Publishing creates a new version. Customers who already booked keep the version they accepted.</p>
@@ -64,7 +70,7 @@ export default function Policies() {
             {rows?.map((p) => (
               <li key={p.key}><button onClick={() => setSel(p.key)} className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm ${current?.key === p.key ? "bg-teal-50 text-teal-900" : "hover:bg-slate-50"}`} data-testid={`policy-item-${p.key}`}>
                 <span>{p.title}{p.audience === "staff" && <span className="ml-1 text-[10px] text-slate-400">(staff)</span>}</span>
-                <span className={`h-2 w-2 rounded-full ${p.published_version ? "bg-teal-500" : "bg-amber-400"}`} />
+                <span className={`h-2 w-2 rounded-full ${p.unpublished ? "bg-slate-300" : p.published_version ? "bg-teal-500" : "bg-amber-400"}`} />
               </button></li>
             ))}
           </ul>

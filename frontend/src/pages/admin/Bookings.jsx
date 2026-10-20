@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DemoTag, Empty, PageHeader, StatusBadge, useLoad } from "@/components/admin/ui";
 import { BookingDetail } from "@/components/admin/BookingDetail";
+import { RefundButton } from "@/components/admin/RefundDialog";
 import { api, errMsg, fmtDate, gbp } from "@/lib/api";
 
 function Actions({ b, reload }) {
@@ -18,10 +19,11 @@ function Actions({ b, reload }) {
     } catch (e) { toast.error(errMsg(e)); }
   };
   if (b.status !== "confirmed") return null;
+  const paid = ["paid", "deposit_paid"].includes(b.payment_status);
   return (
     <div className="flex gap-2">
       <Button size="sm" className="bg-teal-600 hover:bg-teal-700" onClick={() => patch("completed")} data-testid={`booking-complete-btn-${b.id}`}>Mark complete</Button>
-      {confirming
+      {paid ? <RefundButton b={b} onDone={reload} /> : confirming
         ? <Button size="sm" variant="destructive" onClick={() => patch("cancelled")} data-testid={`booking-cancel-confirm-btn-${b.id}`}>Confirm cancel</Button>
         : <Button size="sm" variant="outline" onClick={() => setConfirming(true)} data-testid={`booking-cancel-btn-${b.id}`}>Cancel</Button>}
     </div>
@@ -74,7 +76,7 @@ export default function Bookings() {
         </Table>
         {rows?.length === 0 && <Empty>No bookings here.</Empty>}
       </div>
-      <BookingDetail b={open} onClose={() => setOpen(null)} reload={reload} />
+      <BookingDetail b={open} onClose={() => setOpen(null)} reload={() => { reload(); setOpen(null); }} />
     </div>
   );
 }

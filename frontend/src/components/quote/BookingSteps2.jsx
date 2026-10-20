@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -94,7 +95,32 @@ export function StepTerms({ policies, base, accepted, setAccepted, needsReview }
 const Row = ({ k, v }) => (v ? <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-sm"><dt className="text-slate-500">{k}</dt><dd className="text-right font-medium text-slate-900">{v}</dd></div> : null);
 const name = (list, key) => list.find(([k]) => k === key)?.[1];
 
-export function StepReview({ p, svc, form, access, photos, date, slot, contact, preview, policies, needsReview, deposit }) {
+const TIPS = [0, 5, 10, 15];
+
+function TipPicker({ tip, setTip }) {
+  const [other, setOther] = useState(false);
+  const pill = (on) => `rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${on ? "border-[#023F00] bg-[#023F00] text-white" : "border-slate-300 bg-white text-slate-700 hover:border-[#8F7E22]"}`;
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5" data-testid="tip-picker">
+      <h3 className="font-display font-semibold text-slate-900">Add a tip for your cleaning team</h3>
+      <p className="mt-1 text-xs text-slate-500">Optional - added to your card payment.</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {TIPS.map((t) => <button key={t} type="button" className={pill(!other && tip === t)} onClick={() => { setOther(false); setTip(t); }} data-testid={`tip-option-${t}`}>{t ? gbp(t) : "No tip"}</button>)}
+        <button type="button" className={pill(other)} onClick={() => setOther(true)} data-testid="tip-option-other">Other</button>
+      </div>
+      {other && <Input type="number" min="0" max="500" step="1" placeholder="Amount in £" value={tip || ""} onChange={(e) => setTip(Math.min(500, Math.max(0, Number(e.target.value) || 0)))} className="mt-3 w-40 font-mono" data-testid="tip-custom-input" />}
+    </div>
+  );
+}
+
+const PayConfirm = ({ base, payOk, setPayOk }) => (
+  <label className="flex items-start gap-3 rounded-2xl border-2 border-[#023F00]/30 bg-[#023F00]/5 p-4 text-sm font-medium text-slate-800" data-testid="pay-terms-confirm">
+    <Checkbox checked={payOk} onCheckedChange={(c) => setPayOk(!!c)} className="mt-0.5" data-testid="quote-pay-terms-checkbox" />
+    <span>I have read and accept the <a href={`${base}/terms`} target="_blank" rel="noreferrer" className="font-semibold text-[#023F00] underline" data-testid="pay-terms-link">Terms and Conditions</a>, including the cancellation and refund policy.</span>
+  </label>
+);
+
+export function StepReview({ p, svc, form, access, photos, date, slot, contact, preview, policies, needsReview, deposit, tip, setTip, payOk, setPayOk, base }) {
   const ptype = p.property_types.find((t) => t.key === form.property_type)?.name;
   const cond = p.conditions.find((c) => c.key === form.condition)?.name;
   return (
@@ -118,6 +144,10 @@ export function StepReview({ p, svc, form, access, photos, date, slot, contact, 
           <h3 className="eyebrow">Itemised price</h3>
           <ul className="mt-3 space-y-1.5 text-sm">{preview.lines.map((l) => <li key={l.label} className="flex justify-between"><span>{l.label}</span><span className="font-mono">{gbp(l.amount)}</span></li>)}</ul>
           <div className="mt-3 flex justify-between border-t border-dashed pt-3 font-semibold"><span>Total</span><span className="font-mono" data-testid="review-total">{gbp(preview.total)}</span></div>
+          {tip > 0 && <>
+            <div className="mt-1 flex justify-between text-sm text-slate-600"><span>Tip for your cleaning team</span><span className="font-mono" data-testid="review-tip">{gbp(tip)}</span></div>
+            <div className="flex justify-between font-semibold text-[#023F00]"><span>To pay now</span><span className="font-mono" data-testid="review-pay-now">{gbp(deposit + tip)}</span></div>
+          </>}
           {deposit < preview.total && <>
             <div className="mt-1 flex justify-between text-sm text-[#023F00]"><span>50% deposit to pay now</span><span className="font-mono" data-testid="review-deposit">{gbp(deposit)}</span></div>
             <div className="flex justify-between text-sm text-slate-600"><span>Balance due immediately after the clean</span><span className="font-mono">{gbp(preview.total - deposit)}</span></div>
@@ -125,6 +155,8 @@ export function StepReview({ p, svc, form, access, photos, date, slot, contact, 
           <p className="mt-3 text-xs text-slate-500">Card payments only, processed securely by Stripe. Your booking is confirmed once the {deposit < preview.total ? "deposit" : "payment"} is received.</p>
         </div>
       )}
+      {!needsReview && preview?.lines && <TipPicker tip={tip} setTip={setTip} />}
+      {!needsReview && preview?.lines && <PayConfirm base={base} payOk={payOk} setPayOk={setPayOk} />}
       {needsReview && <p className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">{(preview?.reasons || []).join(" ")} We'll review your details and photos and contact you with an exact price - nothing is charged now.</p>}
       <p className="text-xs text-slate-500">Booking terms: {policies.map((x) => `${x.title} (v${x.published_version})`).join(", ") || "-"}</p>
     </div>
