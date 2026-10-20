@@ -86,6 +86,7 @@ function Footer({ b }) {
 
 export default function SiteLayout() {
   const [cfg, setCfg] = useState(null);
+  const loc = useLocation();
   useEffect(() => { api.get(`/public/${DEFAULT_SLUG}/config`).then((r) => setCfg(r.data)).catch(() => {}); }, []);
   if (!cfg) return <div className="p-16 text-center font-mono text-sm text-slate-400">Loading…</div>;
   return (
@@ -94,7 +95,7 @@ export default function SiteLayout() {
       <Header b={cfg.business} />
       <Outlet context={cfg} />
       <Footer b={cfg.business} />
-      {cfg.business.phone && <MobileCallBar b={cfg.business} />}
+      {cfg.business.phone && !loc.pathname.startsWith("/quote") && <MobileCallBar b={cfg.business} />}
       {cfg.ai_receptionist && <ChatWidget />}
     </div>
   );

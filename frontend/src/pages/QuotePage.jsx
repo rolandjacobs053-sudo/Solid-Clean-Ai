@@ -12,7 +12,7 @@ import { StepExtras, StepProperty, StepService } from "@/components/quote/Bookin
 import { StepAccess, StepContact, StepReview, StepTerms, accessOk } from "@/components/quote/BookingSteps2";
 
 const STEPS = ["Service", "Property", "Photos", "Extras", "Access", "Date & details", "Terms", "Review"];
-const TITLES = ["Which cleaning service do you need?", "Tell us about the property", "", "Any additional services?", "How will we access the property?", "Choose a time & add your details", "Booking terms & policies", "Check your booking"];
+const TITLES = ["Which cleaning service do you need?", "Tell us about the property", "Show us the property", "Any additional services?", "How will we access the property?", "Choose a time & add your details", "Booking terms & policies", "Check your booking"];
 const INITIAL = { service: "regular", property_type: "flat", bedrooms: 2, bathrooms: 1, living_rooms: 1, condition: "good", extras: [], postcode: "", promo_code: "",
   address: "", furnished: "", pets: "no", pet_hair_odour: false, additional_areas: [], flooring: "", property_notes: "" };
 const ACCESS0 = { method: "customer_present", person_name: "", person_phone: "", agency_name: "", agency_address: "", agency_instructions: "", notes: "" };
@@ -46,7 +46,7 @@ export default function QuotePage() {
     return () => clearTimeout(t);
   }, [form, pub, date]);
 
-  useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [step]);
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); document.querySelector(`[data-testid="quote-step-${step + 1}"]`)?.scrollIntoView({ inline: "center", block: "nearest" }); }, [step]);
 
   if (!config) return <div className="p-16 text-center font-mono text-sm text-slate-500">Loading price list…</div>;
   const p = { ...config.pricing, services: config.pricing.services.filter((s) => s.active !== false && s.online_booking !== false) };
@@ -82,7 +82,7 @@ export default function QuotePage() {
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8" data-testid="quote-page">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><p className="eyebrow">Book online</p><h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">{TITLES[step] || "Upload Photos of Your Property"}</h1></div>
+        <div><p className="eyebrow">Book online</p><h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">{TITLES[step]}</h1></div>
         {config.business.phone && <a href={`tel:${config.business.phone.replace(/\s/g, "")}`} className="flex items-center gap-2 text-sm font-semibold text-[#023F00]" data-testid="quote-call-link"><Phone className="h-4 w-4" />Prefer to book by phone? {config.business.phone}</a>}
       </div>
       <ol className="mt-6 flex gap-1.5 overflow-x-auto pb-1" data-testid="quote-stepper">

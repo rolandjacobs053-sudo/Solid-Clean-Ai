@@ -67,7 +67,7 @@ export function StepProperty({ p, form, set, postcodeOk }) {
       <Block label="Additional rooms or areas to clean">
         <div className="mt-3 flex flex-wrap gap-2" data-testid="quote-additional-areas">
           {AREAS.map((a) => <button key={a} type="button" onClick={() => toggleArea(a)} data-testid={`quote-area-${a.split(" ")[0].toLowerCase()}`}
-            className={`rounded-full border px-4 py-2 text-sm transition-colors ${form.additional_areas.includes(a) ? "border-[#8F7E22] bg-[#8F7E22]/10 text-[#023F00]" : "border-slate-200 bg-white text-slate-700"}`}>{a}</button>)}
+            className={`rounded-full border px-4 py-2 text-sm transition-colors ${form.additional_areas.includes(a) ? "border-[#023F00] bg-[#023F00] text-white" : "border-slate-200 bg-white text-slate-700"}`}>{a}</button>)}
         </div>
         <p className="mt-2 text-xs text-slate-500">Balconies and patios can be added as an extra in a later step.</p>
       </Block>

@@ -23,7 +23,8 @@ def set_auth_cookies(response: Response, user_id: str, email: str):
 @router.post("/login")
 async def login(body: LoginIn, request: Request, response: Response):
     email = body.email.lower().strip()
-    ident = f"{request.client.host if request.client else 'x'}:{email}"
+    ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "x")).split(",")[0].strip()
+    ident = f"{ip}:{email}"
     attempt = await db.login_attempts.find_one({"identifier": ident})
     if attempt and attempt.get("count", 0) >= 5:
         locked_at = datetime.fromisoformat(attempt["last"])

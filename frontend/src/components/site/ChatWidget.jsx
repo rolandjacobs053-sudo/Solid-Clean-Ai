@@ -108,7 +108,7 @@ export function ChatWidget() {
     return (
       <button onClick={start} data-testid="ai-chat-toggle-btn"
         className="fixed bottom-24 right-4 z-50 flex items-center gap-2 rounded-full bg-slate-900 px-5 py-3.5 text-sm font-medium text-white shadow-2xl shadow-teal-900/30 transition-transform hover:-translate-y-0.5 hover:bg-teal-700 md:bottom-6 md:right-6">
-        <MessageCircle className="h-4 w-4" /> Ask our receptionist
+        <MessageCircle className="h-4 w-4" /><span className="hidden sm:inline">Ask our receptionist</span>
       </button>
     );
 

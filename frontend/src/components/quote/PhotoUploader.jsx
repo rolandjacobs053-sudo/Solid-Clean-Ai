@@ -7,12 +7,11 @@ import { api, errMsg } from "@/lib/api";
 const MAX = 10;
 const MAX_MB = 10;
 
-function Thumb({ p, onRemove, onReplace }) {
+function Thumb({ p, onRemove, onReplace, onBroken }) {
   return (
     <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50" data-testid="photo-thumb">
-      <div className="aspect-square">
-        <img src={p.preview} alt={p.name} className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-        <ImageOff className="absolute inset-0 m-auto -z-0 h-6 w-6 text-slate-300" />
+      <div className="relative aspect-square">
+        {p.broken ? <ImageOff className="absolute inset-0 m-auto h-6 w-6 text-slate-300" /> : <img src={p.preview} alt={p.name} className="h-full w-full object-cover" onError={() => onBroken()} />}
       </div>
       {p.status === "uploading" && <div className="absolute inset-0 flex items-center justify-center bg-white/70"><Loader2 className="h-6 w-6 animate-spin text-slate-700" /></div>}
       {p.status === "error" && <div className="absolute inset-x-0 bottom-0 bg-red-600/90 p-1.5 text-[11px] leading-tight text-white" data-testid="photo-upload-error">{p.error}</div>}
@@ -30,9 +29,15 @@ export function PhotoUploader({ pub, photos, setPhotos }) {
   const update = (local, patch) => setPhotos((list) => list.map((x) => (x.local === local ? { ...x, ...patch } : x)));
   const remove = (local) => setPhotos((list) => { const x = list.find((p) => p.local === local); if (x) URL.revokeObjectURL(x.preview); return list.filter((p) => p.local !== local); });
 
-  const upload = async (file) => {
+  const upload = async (file, at) => {
     const local = Math.random().toString(36).slice(2);
-    setPhotos((list) => [...list, { local, preview: URL.createObjectURL(file), name: file.name, status: "uploading" }]);
+    const item = { local, preview: URL.createObjectURL(file), name: file.name, status: "uploading" };
+    setPhotos((list) => {
+      if (!at) return [...list, item];
+      const i = list.findIndex((x) => x.local === at);
+      if (i >= 0) URL.revokeObjectURL(list[i].preview);
+      return i < 0 ? [...list, item] : list.map((x, j) => (j === i ? item : x));
+    });
     if (file.size > MAX_MB * 1024 * 1024) return update(local, { status: "error", error: `Larger than ${MAX_MB} MB` });
     const fd = new FormData();
     fd.append("file", file);
@@ -43,12 +48,21 @@ export function PhotoUploader({ pub, photos, setPhotos }) {
   };
 
   const onFiles = (files) => {
-    if (replacing.current) { remove(replacing.current); replacing.current = null; }
-    const room = MAX - photos.filter((p) => p.local !== replacing.current).length;
     const list = [...files];
-    if (list.length > room) toast.error(`You can upload up to ${MAX} photos.`);
-    list.slice(0, Math.max(room, 0)).forEach(upload);
+    const at = replacing.current;
+    replacing.current = null;
     input.current.value = "";
+    if (!list.length) return;
+    if (at) { upload(list[0], at); list.shift(); }
+    const room = MAX - photos.length;
+    if (list.length > room) toast.error(`You can upload up to ${MAX} photos.`);
+    list.slice(0, Math.max(room, 0)).forEach((f) => upload(f));
+  };
+  const pick = (at) => {
+    replacing.current = at;
+    const reset = () => { setTimeout(() => { if (!input.current?.files?.length) replacing.current = null; }, 500); window.removeEventListener("focus", reset); };
+    window.addEventListener("focus", reset);
+    input.current.click();
   };
 
   return (
@@ -56,7 +70,7 @@ export function PhotoUploader({ pub, photos, setPhotos }) {
       <h2 className="font-display text-2xl font-bold text-slate-900">Upload Photos of Your Property</h2>
       <p className="mt-2 max-w-2xl text-sm text-slate-600">Please upload clear photographs of your property and any areas that may require additional attention. This helps Solid Clean Ltd understand the property’s condition and assess the cleaning work required.</p>
       <input ref={input} type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => onFiles(e.target.files)} data-testid="photo-file-input" />
-      <button type="button" onClick={() => input.current.click()} disabled={photos.length >= MAX}
+      <button type="button" onClick={() => pick(null)} disabled={photos.length >= MAX}
         className="mt-5 flex w-full flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-slate-300 bg-white px-6 py-10 text-center transition-colors hover:border-[#8F7E22] hover:bg-[#8F7E22]/5 disabled:opacity-50" data-testid="photo-add-btn">
         <Camera className="h-8 w-8 text-[#023F00]" />
         <span className="font-semibold text-slate-900">{photos.length ? "Add more photos" : "Take or choose photos"}</span>
@@ -64,7 +78,7 @@ export function PhotoUploader({ pub, photos, setPhotos }) {
       </button>
       {photos.length > 0 && (
         <div className="mt-5 grid grid-cols-3 gap-3 sm:grid-cols-5" data-testid="photo-preview-grid">
-          {photos.map((p) => <Thumb key={p.local} p={p} onRemove={() => remove(p.local)} onReplace={() => { replacing.current = p.local; input.current.click(); }} />)}
+          {photos.map((p) => <Thumb key={p.local} p={p} onRemove={() => remove(p.local)} onReplace={() => pick(p.local)} onBroken={() => update(p.local, { broken: true })} />)}
         </div>
       )}
       <p className="mt-4 text-xs text-slate-500" data-testid="photo-count">{photos.filter((p) => p.status === "done").length} photo(s) uploaded. Photos are optional - you can continue without them. They are only seen by the Solid Clean team.</p>

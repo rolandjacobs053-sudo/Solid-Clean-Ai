@@ -8,7 +8,9 @@ import { useAuth } from "@/context/AuthContext";
 import { api, errMsg, fmtDate, gbp } from "@/lib/api";
 
 const ACCESS = { customer_present: "Customer will be present", authorised_person: "Authorised person will give access", estate_agency: "Keys collected from estate agency", other: "Other arrangement" };
-const nice = (v) => (v ? String(v).replace(/_/g, " ") : "");
+const nice = (v) => (v ? String(v).replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase()) : "");
+const LABELS = { flat: "Flat / Apartment", good: "Well maintained", poor: "Needs extra attention", very_poor: "Very heavy soiling", part: "Part furnished", hard: "Mostly hard floors", carpet: "Mostly carpet", mixed: "Mix of carpet and hard floors", yes: "Pets live here", recent: "Pets lived here recently", no: "No pets", terms: "Company Policy (booking terms)" };
+const lab = (v) => LABELS[v] || nice(v);
 
 export function AuthImg({ id, className }) {
   const [src, setSrc] = useState(null);
@@ -46,12 +48,12 @@ function Detail({ b, reload }) {
     <div className="mt-4 space-y-4" data-testid="booking-detail">
       <div className="flex flex-wrap gap-2"><StatusBadge status={b.status} /><StatusBadge status={b.payment_status} /><span className="font-mono text-xs text-slate-500">ref {b.reference || "-"}</span></div>
       <Sec title="Appointment"><R k="Date" v={`${fmtDate(b.date)} · ${b.slot}`} /><R k="Assigned to" v={b.assigned_name || "Unassigned"} /></Sec>
-      <Sec title="Customer" testid="booking-detail-customer"><R k="Name" v={b.customer.name} /><R k="Phone" v={<a className="underline" href={`tel:${b.customer.phone}`}>{b.customer.phone}</a>} /><R k="Email" v={b.customer.email} /></Sec>
+      <Sec title="Customer" testid="booking-detail-customer"><R k="Name" v={b.customer.name} /><R k="Phone" v={<a className="underline" href={`tel:${b.customer.phone}`}>{b.customer.phone}</a>} /><R k="Email" v={<a className="underline" href={`mailto:${b.customer.email}`}>{b.customer.email}</a>} /></Sec>
       <Sec title="Property" testid="booking-detail-property">
         <R k="Address" v={[b.address || i.address, b.postcode].filter(Boolean).join(", ")} />
-        <R k="Type" v={`${nice(i.property_type)} · ${i.bedrooms ?? "-"} bed · ${i.bathrooms ?? "-"} bath · ${i.living_rooms ?? "-"} living`} />
-        <R k="Condition" v={nice(i.condition)} /><R k="Furnished" v={nice(i.furnished)} /><R k="Flooring" v={nice(i.flooring)} />
-        <R k="Pets" v={`${nice(i.pets) || "-"}${i.pet_hair_odour ? " · significant pet hair/odour" : ""}`} />
+        <R k="Type" v={`${lab(i.property_type)} · ${i.bedrooms ?? "-"} bed · ${i.bathrooms ?? "-"} bath · ${i.living_rooms ?? "-"} living`} />
+        <R k="Condition" v={lab(i.condition)} /><R k="Furnished" v={lab(i.furnished)} /><R k="Flooring" v={lab(i.flooring)} />
+        <R k="Pets" v={`${lab(i.pets) || "-"}${i.pet_hair_odour ? " · significant pet hair/odour" : ""}`} />
         <R k="Additional areas" v={(i.additional_areas || []).join(", ")} />
         {i.property_notes && <p className="mt-1 rounded-lg bg-slate-50 p-2 text-sm">{i.property_notes}</p>}
       </Sec>
@@ -70,7 +72,7 @@ function Detail({ b, reload }) {
         {(a.notes || (!b.access && b.access_notes)) && <p className="mt-1 rounded-lg bg-amber-50 p-2 text-sm text-amber-900">{a.notes || b.access_notes}</p>}
       </Sec>
       <Sec title="Booking terms accepted" testid="booking-detail-terms">
-        {Object.entries(b.accepted_policies || {}).map(([k, v]) => <R key={k} k={<a className="underline" href={`/policies#${k}`} target="_blank" rel="noreferrer">{nice(k)}</a>} v={`version ${v}`} />)}
+        {Object.entries(b.accepted_policies || {}).map(([k, v]) => <R key={k} k={<a className="underline" href={`/policies#${k}`} target="_blank" rel="noreferrer">{lab(k)}</a>} v={`version ${v}`} />)}
         {!Object.keys(b.accepted_policies || {}).length && <p className="text-sm text-slate-400">No terms were required when this booking was made.</p>}
         <p className="mt-1 text-xs text-slate-400">Recorded {b.created_at ? new Date(b.created_at).toLocaleString("en-GB") : ""}</p>
       </Sec>

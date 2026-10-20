@@ -21,6 +21,14 @@ Earlier history: started as an integrated Solid Clean system, then a multi-tenan
 - 2026-10-11: SaaS core, Solid Clean public site + booking, CRM, AI chat, marketing tools, policies, Stripe, RBAC, Airbnb/parking removal
 - 2026-10-20: removed Standard Cleaning; removed "Get a Quote" buttons (Book a Cleaning kept); new extras (Single/Double oven, Dishwasher, Blinds); Supplies & equipment £25; real transactional email (quotes, confirmations, day-before reminders); Staff schedule weekly calendar (/admin/schedule); AI phone receptionist code (NOT CONNECTED - awaiting Twilio); audit report
 
+- 2026-10-20 (later): user request "Website looks very simple... customers upload photographs... retrieve my original policies... show me my private management dashboard". Delivered: call-focused site (call strip, header phone, hero call, call band, mobile Call/Book bar); 8-step booking (Service → Property [EoT adds furnished/flooring] → "Upload Photos of Your Property" → Extras → Access [estate agency keys] → Date & details → Terms → Review); photos in Emergent object storage (`routes_photos.py`, `storage.py`), private and linked to booking/lead, viewable in the admin BookingDetail sheet (Bookings, Staff schedule, Lead drawer); extras Freezer defrost £75 (replaces fridge clean) and Hob £25, Supplies £25 kept; 50% deposit (payment_mode deposit_50) plus "Email balance payment link"; the owner's Company Policy published verbatim (section 12 order fixed) plus the old-site FAQ guarantee/refund/breakage wording (with the old FAQ phone/email swapped for the approved ones); owner alerts go to info@solidcleanltd.com; login lockout now uses X-Forwarded-For; stale pending photos are soft-deleted after 24h. Old-site Terms/Privacy/Refund pages were WordPress theme placeholders, so nothing was imported from them. Service name kept as "Residential / Regular Clean" (user's instruction).
+- Tests: iteration_4 backend 11/11, frontend flows pass; the PhotoUploader overlay/replace bugs were fixed afterwards
+
+## Open questions
+- Service-area postcode prefixes only cover South/South-West London + Surrey (SW, SE, CR, SM, KT, TW, BR, RH, GU). N, E, W, NW, EC, WC go to manual review. Owner to confirm
+- Freezer defrost "includes fridge/freezer cleaning" wording needs owner confirmation
+- Privacy policy still unpublished (draft); late-payment fee clause may need legal review
+
 ## Mocked / not connected
 - SMS/WhatsApp SIMULATED; cold email SIMULATED; phone receptionist NOT CONNECTED; Google APIs not connected; Stripe TEST mode
 - Owner alert email is a placeholder; provisional prices: Double oven £65, Dishwasher £20, Blinds £20

@@ -7,6 +7,8 @@ from core import db, get_settings, now, now_iso, oid, set_tenant, tdb
 async def run_automations() -> dict:
     s = await get_settings()
     biz = s["business"]
+    await tdb.photos.update_many({"status": "pending", "is_deleted": False, "created_at": {"$lt": (now() - timedelta(hours=24)).isoformat()}},
+                                 {"$set": {"is_deleted": True, "deleted_reason": "never attached to a booking"}})
     cutoff = (now() - timedelta(hours=biz["follow_up_after_hours"])).isoformat()
     follow_ups = 0
     async for q in tdb.quotes.find({"status": "sent", "created_at": {"$lte": cutoff},

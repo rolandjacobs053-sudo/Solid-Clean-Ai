@@ -105,9 +105,9 @@ def _source(s: str) -> str:
     return s if s in SOURCES else "website"
 
 
-async def store_quote(q: dict, result: dict, lead_id, source: str, conversation_id=None) -> str:
+async def store_quote(q: dict, result: dict, lead_id, source: str, conversation_id=None, status=None) -> str:
     doc = {"input": q, "result": result, "total": result.get("total"), "service_name": result.get("service_name"),
-           "status": "sent" if result["status"] == "ok" else "needs_review", "lead_id": lead_id, "source": source,
+           "status": status or ("sent" if result["status"] == "ok" else "needs_review"), "lead_id": lead_id, "source": source,
            "conversation_id": conversation_id, "follow_ups_sent": 0, "created_at": now_iso()}
     return str((await tdb.quotes.insert_one(doc)).inserted_id)
 
@@ -246,7 +246,7 @@ async def create_booking(body: BookingIn):
     if quote_id:
         await tdb.quotes.update_one({"_id": oid(quote_id)}, {"$set": {"lead_id": lead_id, "input": q, "result": result, "total": result["total"]}})
     else:
-        quote_id = await store_quote(q, result, lead_id, lead["source"])
+        quote_id = await store_quote(q, result, lead_id, lead["source"], status="booking_started")
     charge = deposit_for(s, result["total"])
     booking = {"lead_id": lead_id, "quote_id": quote_id, "customer": {k: contact[k] for k in ("name", "email", "phone")},
                "postcode": q["postcode"].upper(), "address": q["address"].strip(), "service": q["service"], "service_name": result["service_name"], "input": q,

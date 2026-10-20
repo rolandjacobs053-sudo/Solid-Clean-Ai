@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 4: tested the call-focused public site, the 8-step booking journey (Regular and EoT), customer photo upload, extras rules, access validation, terms acceptance, the 50% deposit and Stripe redirect, photo security (anonymous, staff and owner), and the admin booking detail on Bookings, Schedule and Lead drawer. Backend: 11/11 new pytest tests pass (photo 200/415/413, preview dedupe and freezer_defrost excludes fridge, 11 extras prices, booking validation 422/409, deposit = 50% stored and payment_transactions.amount = deposit, photos attached with booking_id, token reuse rejected, quote GET has no address, admin photo endpoints 401 for anonymous users, staff 404 until assigned then 200). Frontend: end-to-end UI booking reached checkout.stripe.com with 'Pay £170.00 deposit & confirm' (total £340). Admin sheet shows customer, property, 2 loading photos, itemised price with deposit and balance, agency access, and terms v1. All call buttons (strip, header, hero, band, mobile bar) link to tel:02037284419. No 'Get a Quote' text anywhere. No horizontal overflow at 390px. Chat button sits above the mobile call bar. The forms never ask about parking (it appears only in the owner's policy text). The core flows work. The issues below are minor or medium.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/login", "issue": "Brute-force lockout key is request.client.host + email. Behind the K8s ingress, client.host is the proxy IP (seen 10.231.129.156 and .157), so failed attempts are split across several keys. 7 wrong passwords in a row all returned 401 and never 429. Use the first X-Forwarded-For IP, or count failures per email only."},
+      {"endpoint": "settings.pricing.service_area_prefixes", "issue": "Only SW, SE, CR, SM, KT, TW, BR, RH, GU are allowed. Postcodes such as NW1, N, E, W, EC and WC show 'outside our standard service area', the booking becomes needs_review and the Pay button is hidden. The site says 'London and Surrey'. Confirm with the owner whether north, east and west London should be added."},
+      {"endpoint": "POST /api/public/solid-clean/photos", "issue": "Photos removed in the UI, or left behind when a customer abandons the form, stay in storage and in the photos collection as status 'pending' forever (currently 11). There is no cleanup job. Anyone without a login can upload up to 300 photos an hour."},
+      {"endpoint": "POST /api/public/solid-clean/bookings", "issue": "store_quote saves every booking attempt as a quote with status 'sent', although no quote email is sent. The lead drawer then lists many 'SENT' quotes for one customer."},
+      {"endpoint": "GET /api/admin/bookings?status=pending_payment", "issue": "Bookings whose 30-minute hold has expired stay under 'Awaiting payment' until Stripe sends checkout.session.expired (about 24h). There is no expiry check based on hold_expires_at."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PhotoUploader Thumb", "issue": "The ImageOff (crossed-out image) icon is drawn on top of every uploaded thumbnail, so successful uploads look broken. It is absolute-positioned, rendered after the <img>, and '-z-0' does not put it behind. Show it only when the image fails to load (onError) or put it under the image.", "selector": "[data-testid='photo-thumb']", "priority": "MEDIUM"},
+      {"component": "PhotoUploader replace", "issue": "(1) If the customer clicks Replace and then cancels the file dialog, replacing.current stays set, so the next 'Add more photos' quietly deletes that photo. (2) With 10 photos, Replace deletes the photo and adds nothing ('up to 10 photos' toast). The free-space count runs after replacing.current is set to null, so it still counts the removed photo. (3) The replacement goes to the end of the grid, not into the same position.", "selector": "[data-testid='photo-replace-btn']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/quote mobile 390px", "issues": ["The 'Ask our receptionist' chat button (197px wide) covers content: extras prices (Hob, Dishwasher) and the replace/remove buttons on the 3rd photo thumbnail. Consider an icon-only chat button on mobile.", "The mobile bar's 'Book online' button is shown on /quote itself, where the customer is already booking.", "The stepper scrolls sideways but the active step is not scrolled into view (e.g. '4. Extras' is cut off).", "'Upload Photos of Your Property' appears twice (page H1 and section H2)."]},
+      {"screen": "/quote details step", "issues": ["The selected calendar day and the selected slot use teal (border-teal-600 / bg-teal) instead of the green/gold brand colours used everywhere else.", "The selected state of the additional-area chips is hard to see (only a slightly darker border)."]},
+      {"screen": "Admin BookingDetail", "issues": ["Property values show raw keys ('flat', 'good', 'furnished', 'carpet', 'yes') instead of labels.", "Under 'Terms accepted' the policy key 'terms' is shown instead of its title.", "The customer email is not a mailto: link (the phone is a tel: link)."]},
+      {"screen": "Lead drawer", "issues": ["'Follow-up date' uses the browser's native date input (shown mm/dd/yyyy, US format) instead of the shadcn Calendar used elsewhere."]},
+      {"screen": "Stripe checkout", "issues": ["Checkout offers a USD conversion (adaptive pricing) and says 'unclaimed sandbox'. This is a Stripe dashboard setting, not code."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_booking_photos_deposit.py", "/app/test_reports/pytest/iteration4_results.xml"],
+  "action_items": [
+    "Fix the PhotoUploader thumbnail overlay: show the ImageOff icon only on load error.",
+    "Fix PhotoUploader replace: reset replacing.current when the dialog is cancelled, compute free space correctly when replacing at 10 photos, and keep the photo in the same position.",
+    "Make the login lockout work behind the ingress (use X-Forwarded-For or count per email).",
+    "Ask the owner whether NW/N/E/W/EC/WC postcodes should be added to service_area_prefixes (they currently cannot pay online).",
+    "Optional: cleanup job for pending photos older than 24h; expire pending_payment bookings past hold_expires_at in the admin list; do not mark auto-created booking quotes as 'sent'.",
+    "Optional design: smaller chat button on mobile, hide 'Book online' in the mobile bar on /quote, use brand colours for the selected calendar day/slot, human labels in BookingDetail, shadcn calendar for the lead follow-up date."
+  ],
+  "critical_code_review_comments": [
+    "routes_photos.py: the public upload has no captcha and no per-IP limit; the only limit is a 300/hour cap for the whole company.",
+    "routes_auth.py login: the lockout key uses request.client.host, which is the proxy IP behind the ingress.",
+    "PhotoUploader.jsx onFiles: the free-space count uses stale `photos` and a replacing.current that is already null.",
+    "BookingIn.accepted_policies is an untyped dict. It works, but a typed Dict[str, int] would be safer.",
+    "CORS on login responses is 'access-control-allow-origin: *' with allow-credentials true (probably set by the ingress). Cookies still work because the frontend is same-origin."
+  ],
+  "updated_files": ["/app/backend/tests/test_booking_photos_deposit.py"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "~92% (all flows work; 2 PhotoUploader UI bugs)"},
+  "test_credentials": "Owner admin@solidcleanltd.com / SolidClean#2026 (works). Temporary staff test_cleaner_31d274@example.com was created and deactivated (users _id 6ad77d34088e8388b69accbf).",
+  "seed_data_creation": "All test bookings are now status 'abandoned' (TEST_booker_* ids 6ad77d22..b0, 6ad77d23..b3, 6ad77d30..ba, 6ad77d32..bd, and TEST_ Jane Booker 6ad77dbf088e8388b69accc6, which I briefly set to confirmed for the Schedule test and then reverted). All of them merged into one lead with email delivered@resend.dev (name TEST_ Jane Booker), with several quotes. Photo records were created for these bookings plus 11 pending orphans. The leftover pending_payment 'TEST_ Booker' 6ad77cb859b7b975f93b1300 was not created by me. Main agent can delete the delivered@resend.dev lead/quotes/bookings/photos and the inactive staff user.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run the backend tests with `-n 0` (pytest.ini uses xdist; the tests share state through pytest attributes). Only use delivered@resend.dev as the customer email. Use SW/SE/CR postcodes, because others go to needs_review. The photo file input is [data-testid=photo-file-input] (hidden); set_input_files works. Admin photos load as blob URLs ([data-testid=admin-photo-img]). The Schedule page only shows confirmed/completed bookings."
+}
