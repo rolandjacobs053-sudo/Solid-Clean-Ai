@@ -6,7 +6,7 @@ import uuid
 from datetime import timedelta
 
 import pillow_heif
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from PIL import Image, ImageOps
 
 from core import current_company, now, now_iso, oid, outs, require_admin, tdb
@@ -65,6 +65,24 @@ async def booking_photos(bid: str, ctx=Depends(require_admin)):
     await _check_booking(bid, ctx)
     rows = await tdb.photos.find({"booking_id": bid, "status": "attached", "is_deleted": False}, {"token": 0, "path": 0}).sort("created_at", 1).to_list(50)
     return outs(rows)
+
+
+@admin.post("/{bid}/photos")
+async def upload_job_photo(bid: str, kind: str = Form(...), file: UploadFile = File(...), ctx=Depends(require_admin)):
+    if kind not in ("before", "after"):
+        raise HTTPException(422, "Photo type must be before or after")
+    b = await _check_booking(bid, ctx)
+    data = await file.read(MAX_BYTES + 1)
+    if len(data) > MAX_BYTES:
+        raise HTTPException(413, "This photo is larger than 10 MB.")
+    try:
+        jpeg = await asyncio.to_thread(_to_jpeg, data)
+    except Exception:
+        raise HTTPException(415, "This file isn't a supported photo.")
+    res = await asyncio.to_thread(put_object, f"{APP_NAME}/{current_company.get()['id']}/jobs/{uuid.uuid4()}.jpg", jpeg, "image/jpeg")
+    doc = {"path": res["path"], "status": "attached", "kind": kind, "booking_id": bid, "lead_id": b.get("lead_id"), "uploaded_by": ctx["user"].get("name") or ctx["user"]["email"],
+           "content_type": "image/jpeg", "size": len(jpeg), "is_deleted": False, "created_at": now_iso(), "attached_at": now_iso()}
+    return {"id": str((await tdb.photos.insert_one(doc)).inserted_id)}
 
 
 @admin.get("/photos/{pid}/file")

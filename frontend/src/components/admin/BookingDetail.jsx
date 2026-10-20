@@ -33,11 +33,33 @@ export const PhotoGrid = ({ photos }) => (
 const Sec = ({ title, children, testid }) => <section className="border-t border-slate-100 pt-4" data-testid={testid}><h3 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-slate-500">{title}</h3>{children}</section>;
 const R = ({ k, v }) => (v || v === 0 ? <div className="flex justify-between gap-4 py-0.5 text-sm"><span className="text-slate-500">{k}</span><span className="text-right font-medium">{v}</span></div> : null);
 
+function JobPhotos({ b, photos, reload }) {
+  const [busy, setBusy] = useState(false);
+  const up = async (kind, files) => {
+    setBusy(true);
+    for (const f of files) {
+      const fd = new FormData(); fd.append("file", f); fd.append("kind", kind);
+      try { await api.post(`/admin/bookings/${b.id}/photos`, fd); } catch (e) { toast.error(errMsg(e)); }
+    }
+    setBusy(false); reload();
+  };
+  return ["before", "after"].map((kind) => (
+    <Sec key={kind} title={`${kind} photos (team)`} testid={`booking-${kind}-photos`}>
+      <PhotoGrid photos={photos.filter((p) => p.kind === kind)} />
+      <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium hover:bg-slate-50">
+        {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : "+"} Add {kind} photos
+        <input type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => up(kind, [...e.target.files])} data-testid={`booking-upload-${kind}-input`} />
+      </label>
+    </Sec>
+  ));
+}
+
 function Detail({ b, reload }) {
   const { user } = useAuth();
   const [photos, setPhotos] = useState(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { api.get(`/admin/bookings/${b.id}/photos`).then((r) => setPhotos(r.data)).catch(() => setPhotos([])); }, [b.id]);
+  const loadPhotos = () => api.get(`/admin/bookings/${b.id}/photos`).then((r) => setPhotos(r.data)).catch(() => setPhotos([]));
+  useEffect(() => { loadPhotos(); }, [b.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const i = b.input || {}, a = b.access || {};
   const sendBalance = async () => {
     setBusy(true);
@@ -57,7 +79,8 @@ function Detail({ b, reload }) {
         <R k="Additional areas" v={(i.additional_areas || []).join(", ")} />
         {i.property_notes && <p className="mt-1 rounded-lg bg-slate-50 p-2 text-sm">{i.property_notes}</p>}
       </Sec>
-      <Sec title={`Photos (${photos?.length ?? "…"})`} testid="booking-detail-photos">{photos ? <PhotoGrid photos={photos} /> : <Loader2 className="h-4 w-4 animate-spin" />}</Sec>
+      <Sec title={`Customer photos (${photos ? photos.filter((p) => !p.kind).length : "…"})`} testid="booking-detail-photos">{photos ? <PhotoGrid photos={photos.filter((p) => !p.kind)} /> : <Loader2 className="h-4 w-4 animate-spin" />}</Sec>
+      {photos && <JobPhotos b={b} photos={photos} reload={loadPhotos} />}
       <Sec title={`Service & price - ${b.service_name}`} testid="booking-detail-price">
         {(b.lines || b.result?.lines || []).map((l) => <R key={l.label} k={l.label} v={gbp(l.amount)} />)}
         <R k="Total" v={gbp(b.total)} />

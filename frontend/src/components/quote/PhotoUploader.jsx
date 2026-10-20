@@ -23,7 +23,7 @@ function Thumb({ p, onRemove, onReplace, onBroken }) {
   );
 }
 
-export function PhotoUploader({ pub, photos, setPhotos }) {
+export function PhotoUploader({ pub, photos, setPhotos, title = "Upload Photos of Your Property", text = "Please upload clear photographs of your property and any areas that may require additional attention. This helps Solid Clean Ltd understand the property’s condition and assess the cleaning work required." }) {
   const input = useRef();
   const replacing = useRef(null);
   const update = (local, patch) => setPhotos((list) => list.map((x) => (x.local === local ? { ...x, ...patch } : x)));
@@ -67,8 +67,8 @@ export function PhotoUploader({ pub, photos, setPhotos }) {
 
   return (
     <div data-testid="photo-upload-section">
-      <h2 className="font-display text-2xl font-bold text-slate-900">Upload Photos of Your Property</h2>
-      <p className="mt-2 max-w-2xl text-sm text-slate-600">Please upload clear photographs of your property and any areas that may require additional attention. This helps Solid Clean Ltd understand the property’s condition and assess the cleaning work required.</p>
+      <h2 className="font-display text-2xl font-bold text-slate-900">{title}</h2>
+      <p className="mt-2 max-w-2xl text-sm text-slate-600">{text}</p>
       <input ref={input} type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => onFiles(e.target.files)} data-testid="photo-file-input" />
       <button type="button" onClick={() => pick(null)} disabled={photos.length >= MAX}
         className="mt-5 flex w-full flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-slate-300 bg-white px-6 py-10 text-center transition-colors hover:border-[#8F7E22] hover:bg-[#8F7E22]/5 disabled:opacity-50" data-testid="photo-add-btn">

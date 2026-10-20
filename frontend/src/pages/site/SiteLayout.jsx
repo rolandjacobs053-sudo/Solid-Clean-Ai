@@ -7,7 +7,7 @@ import { DEFAULT_SLUG } from "@/lib/tenant";
 
 export const G = "#023F00";
 export const GOLD = "#8F7E22";
-const NAV = [["/services", "Services"], ["/areas", "Service areas"], ["/reviews", "Reviews"], ["/faq", "FAQ"], ["/about", "About"], ["/contact", "Contact"]];
+const NAV = [["/services", "Services"], ["/commercial-cleaning", "Commercial"], ["/areas", "Service areas"], ["/reviews", "Reviews"], ["/faq", "FAQ"], ["/about", "About"], ["/contact", "Contact"]];
 const LEGAL = [["/policies", "Company policies"], ["/privacy", "Privacy policy"], ["/cookies", "Cookie policy"], ["/terms", "Terms & conditions"]];
 
 export const BookBtn = ({ children = "Book a Cleaning", className = "", testid = "book-cleaning-btn" }) => (
