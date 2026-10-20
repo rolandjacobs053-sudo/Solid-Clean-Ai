@@ -45,7 +45,7 @@ function ReviewCard({ r, reload }) {
   const hide = async (hidden) => {
     const hidden_reason = hidden ? window.prompt("Why are you hiding this review? (only for offensive, fake or off-topic content - not for negative reviews)") : "";
     if (hidden && !hidden_reason) return;
-    await api.patch(`/admin/reviews/${r.id}`, { hidden, hidden_reason }); toast.success(hidden ? "Hidden from the website" : "Shown on the website"); reload();
+    try { await api.patch(`/admin/reviews/${r.id}`, { hidden, hidden_reason }); toast.success(hidden ? "Hidden from the website" : "Shown on the website"); reload(); } catch (e) { toast.error(errMsg(e)); }
   };
   const web = r.source === "customer_feedback";
   return (

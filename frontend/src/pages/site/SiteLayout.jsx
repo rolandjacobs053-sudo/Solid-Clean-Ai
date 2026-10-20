@@ -124,7 +124,7 @@ export default function SiteLayout() {
       <Header b={cfg.business} />
       <Outlet context={cfg} />
       <Footer b={cfg.business} />
-      {cfg.business.phone && !loc.pathname.startsWith("/quote") && !loc.pathname.startsWith("/commercial-cleaning/request") && !loc.pathname.startsWith("/carpet-cleaning/request") && !loc.pathname.startsWith("/residential-cleaning") && <MobileCallBar b={cfg.business} />}
+      {cfg.business.phone && !loc.pathname.startsWith("/quote") && !loc.pathname.startsWith("/commercial-cleaning/request") && !loc.pathname.startsWith("/carpet-cleaning/request") && !loc.pathname.startsWith("/residential-cleaning") && !loc.pathname.startsWith("/feedback") && <MobileCallBar b={cfg.business} />}
       {cfg.business.phone && <CallDialog phone={cfg.business.phone} />}
       {cfg.ai_receptionist && <ChatWidget />}
     </div>

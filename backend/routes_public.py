@@ -206,7 +206,7 @@ async def _feedback_booking(bid: str, t: str) -> dict:
 @public.get("/feedback/{bid}")
 async def feedback_info(bid: str, t: str):
     info = await _feedback_booking(bid, t)
-    first, *rest = info["name"].split()
+    first, *rest = (info["name"].split() or ["there"])
     s = await get_settings()
     return {"service_name": info["service_name"], "date": info["date"], "first_name": first, "suggested_name": f"{first} {rest[-1][0]}." if rest else first,
             "done": info["done"], "google_link": s["business"].get("review_link") if (s["business"].get("review_link") or "").startswith("https://") else ""}

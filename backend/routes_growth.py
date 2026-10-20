@@ -208,7 +208,11 @@ async def draft_review_reply(rid: str):
 
 @reviews_r.patch("/reviews/{rid}")
 async def patch_review(rid: str, body: ReviewPatch):
-    await tdb.reviews.update_one({"_id": oid(rid)}, {"$set": body.model_dump(exclude_none=True)})
+    if body.status is not None and body.status not in ("new", "needs_attention", "draft_ready", "approved"):
+        raise HTTPException(422, "Invalid status")
+    res = await tdb.reviews.update_one({"_id": oid(rid)}, {"$set": body.model_dump(exclude_none=True)})
+    if not res.matched_count:
+        raise HTTPException(404, "Review not found")
     return {"ok": True}
 
 

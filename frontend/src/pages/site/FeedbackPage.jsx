@@ -25,7 +25,7 @@ export default function FeedbackPage() {
   useEffect(() => { api.get(url, { params: { t } }).then((r) => { setInfo(r.data); setName(r.data.suggested_name); }).catch(() => setInfo("invalid")); }, [url, t]);
   const submit = async () => {
     setBusy(true);
-    try { await api.post(url, { t, rating, text, display_name: name, publish_consent: consent }); setSent(true); } catch (e) { toast.error(errMsg(e)); }
+    try { await api.post(url, { t, rating, text, display_name: name, publish_consent: consent }); setSent(true); } catch (e) { if (e.response?.status === 409) setSent(true); else toast.error(errMsg(e)); }
     setBusy(false);
   };
   if (!info) return <div className="p-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-[#023F00]" /></div>;

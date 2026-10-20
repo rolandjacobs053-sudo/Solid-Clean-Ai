@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 13: Regular Clients dashboard + customer feedback/review collector. Backend pytest 13/13 passed (recurring list fields, no payment_method/stripe_customer leak, card_saved, visits/last_visit, staff 403, pause/resume/cancel incl. resume-without-card 400 and cancelled-is-final 400; complete booking -> feedback_token + 'How did we do?' email with correct https://{host}/feedback/{id}?t= link; feedback info suggested_name 'First L.'; wrong token 404; rating/name validation 422; submit creates review source=customer_feedback platform=website booking_id publish_consent status new / needs_attention (<=3) + owner notification; duplicate submit 409 and done=true; public reviews include consented (verified true, no internal fields) and exclude non-consented and hidden; admin PATCH hidden/hidden_reason; staff completes own job (token set) and 403 on others). Frontend (Playwright) all flows pass: admin nav -> /admin/regular-clients, stat cards correct (Expected/month 533.33 then 360.00 after cancel = weekly 60x52/12 + fortnightly 80x26/12 + monthly 100), tabs filter correctly, Pause/Resume/Cancel (with confirm) update status and stats, cancelled rows have no buttons; feedback page invalid token -> feedback-invalid, name prefilled, submit disabled until star chosen, consent checkbox, submit -> feedback-thanks, reload -> thanks; /reviews shows card with site-review-verified 'Verified customer · Residential / Regular Clean'; admin Reviews review-web-status shows 'Shown on your website', hide button prompts for reason, toggles to 'Hidden from website: <reason>' and back, public API reflects it. All TEST_ data deleted.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PATCH /api/admin/reviews/{id}", "issue": "No 404 for unknown id (returns ok:true) and `status` accepts any string; hidden can be set on non-consented reviews (harmless)."},
+      {"endpoint": "GET /api/public/{slug}/feedback/{id}", "issue": "feedback_info does `first, *rest = name.split()` - a booking with empty/whitespace customer name would 500. Edge case."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "FeedbackPage", "issue": "If the customer submits twice (e.g. two tabs), the 409 only shows an error toast; the form stays instead of switching to the thanks/done state.", "selector": "[data-testid='feedback-submit-btn']", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Feedback link multi-tenant", "issue": "FeedbackPage uses DEFAULT_SLUG ('solid-clean') for the API call and the email link is /feedback/{id} (no /c/{slug}). For any other CleanOps tenant the link would show 'This link is not valid'. Same pre-existing pattern as /tip and /results. Fine for Solid Clean.", "affected_selectors": ["[data-testid='feedback-page']"]}
+    ],
+    "design_issues": [
+      {"screen": "Admin Reviews", "issues": ["4th KPI tile (trend line chart) renders almost empty - just a dot visible - looks broken with few data points; consider a label/axis or minimum height"]},
+      {"screen": "Feedback page (mobile 390px)", "issues": ["Floating chat bubble overlaps right edge of the name input / consent line; sticky Call us/Book online bar covers the lower form until scrolled - consider hiding the sticky CTA bar on /feedback"]},
+      {"screen": "Admin Reviews hide", "issue_note": "hide() has no try/catch - API error would be an unhandled promise without toast"}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter13_regular_clients_feedback.py", "/app/backend/tests/seed_iter13_ui.py", "/app/test_reports/pytest/pytest_iter13.xml"],
+  "action_items": [
+    "Optional: on 409 from feedback submit, set the page to thanks/done state",
+    "Optional: guard empty customer name in feedback_info; 404 in patch_review for unknown id",
+    "Optional: tenant-aware feedback/tip/results links (/c/{slug}/feedback/...) if other tenants will use this",
+    "Optional: hide sticky CTA bar/chat bubble on /feedback mobile; add try/catch to Reviews hide()"
+  ],
+  "critical_code_review_comments": [
+    "list_plans correctly pops payment_method and projects out stripe_customer; out() strips _id",
+    "submit_feedback race-safe via conditional update on review_id $exists:false + rollback delete - good",
+    "public_reviews filter correct: excludes demo, hidden, and non-consented customer_feedback"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter13_regular_clients_feedback.py", "/app/backend/tests/seed_iter13_ui.py"],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "100%"},
+  "seed_data_creation": "TEST_ recurring plans/bookings/leads tagged ui13:true via seed_iter13_ui.py; removed with `python tests/seed_iter13_ui.py cleanup`. Pytest fixture deletes its own TEST_ data incl. staff user. Note: 3 leftover test_cleaner_*@example.com staff users exist from earlier iterations (not created here).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: REACT_APP_BACKEND_URL=... pytest tests/test_iter13_regular_clients_feedback.py (pytest.ini uses xdist loadscope). Resume requires payment_method on plan. Admin reviews GET returns {reviews, stats}. Resend rejects @example.com recipients (expected).",
+  "test_credentials": "Owner admin@solidcleanltd.com / SolidClean#2026 (from /app/memory/test_credentials.md)"
+}
