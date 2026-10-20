@@ -51,7 +51,7 @@ export function RefundButton({ b, onDone, size = "sm" }) {
           </DialogHeader>
           {q && (
             <div className="space-y-4">
-              <p className="text-sm text-slate-600" data-testid="refund-notice">Notice given: <b>{q.notice_hours >= 48 ? `${Math.floor(q.notice_hours / 24)} days ${Math.round(q.notice_hours % 24)} h` : `${q.notice_hours} hours`}</b> before the appointment.</p>
+              <p className="text-sm text-slate-600" data-testid="refund-notice">Notice given: <b>{q.notice_hours >= 48 ? `${Math.floor(q.notice_hours / 24)} days ${Math.floor(q.notice_hours % 24)} h` : `${q.notice_hours} hours`}</b> before the appointment.</p>
               <Rules pct={q.rule_percent} />
               <div className="rounded-xl border border-slate-200 p-3 text-sm">
                 <div className="flex justify-between"><span className="text-slate-500">Paid for the clean</span><span className="font-mono">{gbp(q.service_paid)}</span></div>

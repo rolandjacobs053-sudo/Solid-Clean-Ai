@@ -1,0 +1,49 @@
+{
+  "summary": "Iteration 8 tested the new T&C features end to end (backend and frontend): complaints policy unpublished, the pay-terms checkbox and tip at checkout, owner Cancel & refund, tip requests, the public tip page, and the PaymentResult page for tips. All 15 new backend pytest tests passed. Every requested UI flow passed on desktop (1920) and mobile (390), with no horizontal overflow. Results: (1) GET /config returns only the 'terms' policy (v2, require_acceptance true). /terms, /policies and the booking terms step show no 'does not offer refunds', deposit or breakages wording. (2) In Admin Policies, complaints shows an UNPUBLISHED badge with no Unpublish button. Terms shows the Unpublish button and its confirm button (I did not confirm, so terms is still published). (3) /quote review step: the tip options, Other + custom input (capped at £500), review-tip, review-pay-now and Pay button amount all update correctly. The Pay button stays disabled until both quote-accept-terms and quote-pay-terms-checkbox are ticked. pay-terms-link points to /terms. Pay redirected to Stripe checkout, which showed the line 'Tip for your cleaning team' and a total of £92 (£87 + £5 tip). (4) Backend: 409 when pay_terms_accepted is missing or false. 422 when tip > 500 or < 0. The booking stores the tip, payment_transactions.amount = total + tip, and Stripe line items match. No tip line is added when tip = 0. (5) Cancel & refund: the button shows only on confirmed paid rows; due rows keep the old Cancel -> Confirm cancel. The dialog highlights the right rule for 10, 4 and 1 days' notice (100/50/0). Suggestions were correct: £125 includes a £5 tip, £60 for 50%, £0. A deposit_paid booking is suggested on its deposit. refund-amount-error and a disabled confirm button appear for an amount over the paid total or an empty amount. Clicking inside the dialog does not open the detail sheet. Confirming cancels the booking, stores refund {amount 75, rule 50, notice_hours, suggested 60, note, to_issue_in_stripe}, shows a toast, logs the booking_cancelled email with the refund text, and the detail sheet shows booking-detail-refund. API: 400 for unpaid, completed, already-cancelled bookings and for amount > paid; 401 without login. (6) Tip request: the Tips section on a completed booking shows the booking tip and tips received after the clean. Sending the request shows the sent label and the button changes to 'Send tip request again'. The API returns url /tip/{id}?t=token and reuses the token on later requests; 400 for a booking that is not completed. (7) Tip page: shows the first name and service, the 5/10/15/20 buttons and a custom amount; tip-pay-btn goes to Stripe for £12. A wrong token shows tip-invalid (API 404). The API rejects amounts < 1 or > 500 (422). (8) Simulated a paid tip transaction: /payments/status returns kind 'tip', after_tip goes to 12 and stays 12 on repeat calls (no double counting), and /payment/success shows 'Thank you for your tip!' with '£12.00 tip paid'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/policies/{key}/unpublish + /publish", "issue": "Unpublish sets require_acceptance=False, but publish only sets unpublished=False and never restores require_acceptance. If the owner unpublishes 'terms' and then re-publishes it, customers are no longer required to accept it (booking create skips it in the required set), unless the owner also turns the toggle back on and saves a draft."},
+      {"endpoint": "POST /api/admin/bookings/{id}/tip-request", "issue": "The tip URL is always https://{host}/tip/{id}. The tip page is only routed at the root, where it uses the default tenant. Tip links from other tenants (/c/:slug) would load the solid-clean tenant and return 404 'link not valid'. There is no /c/:slug/tip route."},
+      {"endpoint": "log_comm (booking_cancelled, tip_request)", "issue": "If the email fails (I saw 429 rate limiting from the Emergent email API during testing), the comm is stored as 'failed' and never retried. The owner UI only says 'Tip request created' and does not show the link to share by hand."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "TipPage custom amount", "issue": "When the customer types a custom amount (e.g. 12) after picking a preset (£15), the £15 pill stays highlighted while the Pay button says £12.00. The preset highlight should clear when a custom amount is entered.", "selector": "[data-testid=tip-custom-amount]", "priority": "LOW"},
+      {"component": "TipPage custom amount", "issue": "Typing 600 is silently capped to £500 without telling the customer.", "selector": "[data-testid=tip-custom-amount]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/quote review step", "issues": ["The 'Your quote' sidebar summary (aside) still shows Total £87 and leaves out the selected tip, while the Pay button says £92. Consider adding the tip / 'To pay now' line to the aside."]},
+      {"screen": "/payment/success for tips", "issues": ["The CTA reads 'Back to booking' after a tip payment; 'Back to home' would be clearer."]},
+      {"screen": "Admin Bookings (cancelled tab)", "issues": ["A booking cancelled with a recorded refund still shows the payment badge 'PAID'. A 'Refund due' / 'Refund to issue' badge would help the owner track manual Stripe refunds."]},
+      {"screen": "RefundDialog notice", "issues": ["Notice text uses Math.round(hours % 24), so values like 95.6 h display as '3 days 24 h'. Use Math.floor."]},
+      {"screen": "Admin Policies", "issues": ["The Effective date field uses the browser's native date input (mm/dd/yyyy) instead of the shadcn calendar (existing issue, not new)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter8_refund_tips.py", "/app/backend/tests/seed_iter8_ui.py", "/app/test_reports/pytest/pytest_iter8.xml"],
+  "action_items": [
+    "Optional: in publish(), restore require_acceptance for policies that used to require acceptance (e.g. store a previous_require_acceptance on unpublish), so that re-publishing 'terms' doesn't silently drop mandatory acceptance.",
+    "Optional: build a tenant-aware tip URL (/c/{slug}/tip/{id}?t=) and add the /c/:slug/tip/:bookingId route.",
+    "Optional: in the TipRequest UI, show the tip link (copy button) and an error toast when email_status is 'failed'.",
+    "Low: TipPage should clear the preset highlight when a custom amount is typed, and show a message when the amount is capped at £500.",
+    "Low: show the tip / amount to pay in the QuoteSummary aside on the review step.",
+    "Low: RefundDialog notice should use Math.floor for hours; consider a 'Refund due' badge on cancelled bookings that have a refund recorded.",
+    "Stale older tests (not regressions): test_booking_photos_deposit.py still expects 50% deposit amounts (the business is now full_upfront), and its module-level pytest.<attr> state breaks under the pytest.ini xdist '-n' setting. Run it with -o addopts=\"\" or update it. I added pay_terms_accepted True to both older test files as requested."
+  ],
+  "critical_code_review_comments": [
+    "routes_policies.unpublish/publish: the require_acceptance asymmetry described above.",
+    "routes_admin.tip_request: scheme is hard-coded to https and the path is not tenant-aware.",
+    "routes_public.TipIn.t has no max_length (minor input-validation gap).",
+    "refund_rule: logic matches the spec (>=168h 100%, >=48h 50%, else 0%, Europe/London, tip refunded in full, deposit_paid uses deposit_amount). cancel_refund uses a conditional update on status 'confirmed', so a race gives 409. Good.",
+    "settle_tip is idempotent through the 'settled' flag. Verified that after_tip does not double count on repeated /payments/status calls."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter8_refund_tips.py", "/app/backend/tests/seed_iter8_ui.py", "/app/backend/tests/test_iter5_fullpay_walkthrough.py", "/app/backend/tests/test_booking_photos_deposit.py"],
+  "success_rate": {"backend": "100% (15/15 new tests)", "frontend": "100% of requested flows passed; only low-priority UX notes"},
+  "test_credentials": "admin@solidcleanltd.com / SolidClean#2026 (from /app/memory/test_credentials.md) - worked",
+  "seed_data_creation": "Seeded TEST_ bookings and leads directly in Mongo (seed_iter8_ui.py seed) and created bookings through the API and UI (TEST_ names). Everything was removed with 'python /app/backend/tests/seed_iter8_ui.py clean' (0 TEST_ bookings and 0 TEST_ leads left; related payment_transactions, communications and quotes deleted). Final state: terms published_version 2, require_acceptance true; complaints unpublished true.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run the new tests with: cd /app/backend && REACT_APP_BACKEND_URL=... python -m pytest tests/test_iter8_refund_tips.py. pytest.ini adds -n (xdist); use -o addopts=\"\" for older files that share module state. To seed UI test data use tests/seed_iter8_ui.py seed|clean (prints booking ids: d10/d4/d1 paid, due, done=completed). Admin bookings tabs testids: bookings-tab-confirmed/completed/pending_payment/cancelled/all; wait for the row selector after switching tabs (the list loads asynchronously). To simulate a paid tip, set the tip payment_transactions doc to payment_status 'paid' and call GET /api/payments/status/{session_id}. The Emergent email API rate-limits (429) when many comms are sent quickly. Server date in this env is Oct 2026."
+}

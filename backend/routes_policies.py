@@ -88,6 +88,6 @@ async def unpublish(key: str, body: PublishIn):
     p = await _get(key)
     if not body.confirm:
         raise HTTPException(400, "Confirmation required")
-    await tdb.policies.update_one({"_id": p["_id"]}, {"$set": {"unpublished": True, "require_acceptance": False, "unpublished_at": now_iso()}})
+    await tdb.policies.update_one({"_id": p["_id"]}, {"$set": {"unpublished": True, "unpublished_at": now_iso()}})
     await audit("policy.unpublish", f"{key} v{p['published_version']}")
     return {"ok": True}

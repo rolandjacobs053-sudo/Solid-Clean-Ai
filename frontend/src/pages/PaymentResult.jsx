@@ -38,11 +38,11 @@ export default function PaymentResult() {
       {status === "paid" && (
         <div data-testid="payment-status-paid">
           <CheckCircle2 className="mx-auto h-14 w-14 text-teal-600" />
-          <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-slate-900">{kind === "tip" ? "Thank you for your tip!" : kind === "balance" ? "Balance paid - thank you" : "Booking confirmed"}</h1>
+          <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-slate-900">{kind === "tip" ? "Thank you for your tip!" : kind === "carpet" ? "Payment received - awaiting approval" : kind === "balance" ? "Balance paid - thank you" : "Booking confirmed"}</h1>
           <p className="mt-4 text-slate-600">{booking.service_name} on <b>{fmtDate(booking.date)}</b> at <b>{booking.slot}</b>.</p>
           <p className="mt-2 font-mono text-2xl font-bold text-teal-700">{gbp(amount ?? booking.total)} {kind === "deposit" ? "deposit paid" : kind === "tip" ? "tip paid" : "paid"}</p>
           {kind === "deposit" && <p className="mt-2 text-sm text-slate-600">The remaining {gbp(booking.total - amount)} is due immediately after the clean.</p>}
-          <p className="mt-4 text-sm text-slate-500">{kind === "tip" ? "We'll pass your thanks on to the team." : "A confirmation is on its way, and we'll send a reminder the day before."}</p>
+          <p className="mt-4 text-sm text-slate-500">{kind === "tip" ? "We'll pass your thanks on to the team." : kind === "carpet" ? "Your booking is not confirmed until we approve the appointment. We'll be in touch shortly to confirm." : "A confirmation is on its way, and we'll send a reminder the day before."}</p>
         </div>
       )}
       {status === "pending" && <p className="text-slate-600" data-testid="payment-status-pending">We're still waiting for confirmation from the payment provider. You'll receive an email once it completes.</p>}
@@ -53,7 +53,7 @@ export default function PaymentResult() {
           <p className="mt-3 text-slate-600">No payment was taken and your slot was released.</p>
         </div>
       )}
-      <Button asChild className="mt-10 rounded-full bg-slate-900 hover:bg-teal-700 hover:text-white" data-testid="payment-back-home-btn"><Link to={`${base}/quote`}>Back to booking</Link></Button>
+      <Button asChild className="mt-10 rounded-full bg-slate-900 hover:bg-teal-700 hover:text-white" data-testid="payment-back-home-btn"><Link to={["tip", "carpet"].includes(kind) ? `${base}/` : `${base}/quote`}>{["tip", "carpet"].includes(kind) ? "Back to home" : "Back to booking"}</Link></Button>
     </main>
   );
 }

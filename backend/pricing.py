@@ -25,7 +25,7 @@ DEFAULT_SETTINGS = {
         "services": [
             {"key": "regular", "name": "Residential / Regular Clean", "base": 45, "per_bedroom": 12, "per_bathroom": 10, "per_living_room": 8, "min_price": 60, "requires_survey": False},
             {"key": "end_of_tenancy", "name": "End of Tenancy Clean", "base": 120, "per_bedroom": 35, "per_bathroom": 30, "per_living_room": 20, "min_price": 180, "requires_survey": False},
-            {"key": "carpet", "name": "Carpet Cleaning", "base": 40, "per_bedroom": 30, "per_bathroom": 0, "per_living_room": 35, "min_price": 70, "requires_survey": False},
+            {"key": "carpet", "name": "Carpet Cleaning", "base": 40, "per_bedroom": 30, "per_bathroom": 0, "per_living_room": 35, "min_price": 100, "from_price": 100, "requires_survey": True},
             {"key": "commercial", "name": "Commercial / Office Cleaning", "base": 0, "per_bedroom": 0, "per_bathroom": 0, "per_living_room": 0, "min_price": 0, "requires_survey": True},
         ],
         "property_types": [
@@ -161,7 +161,7 @@ def compute_quote(pricing: dict, q: dict, public: bool = True) -> dict:
 def _active_booking_filter(day: str):
     cutoff = (now().replace(microsecond=0)).isoformat()
     return {"date": day, "$or": [
-        {"status": "confirmed"},
+        {"status": {"$in": ["confirmed", "awaiting_approval"]}},
         {"status": "pending_payment", "hold_expires_at": {"$gt": cutoff}},
     ]}
 

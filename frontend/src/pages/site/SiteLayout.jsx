@@ -1,19 +1,48 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { Menu, Phone, X } from "lucide-react";
+import { Copy, Menu, Phone, X } from "lucide-react";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ChatWidget } from "@/components/site/ChatWidget";
 import { api } from "@/lib/api";
 import { DEFAULT_SLUG } from "@/lib/tenant";
 
 export const G = "#023F00";
 export const GOLD = "#8F7E22";
-const NAV = [["/services", "Services"], ["/commercial-cleaning", "Commercial"], ["/areas", "Service areas"], ["/reviews", "Reviews"], ["/faq", "FAQ"], ["/about", "About"], ["/contact", "Contact"]];
+const NAV = [["/services", "Services"], ["/carpet-cleaning", "Carpet"], ["/commercial-cleaning", "Commercial"], ["/areas", "Service areas"], ["/reviews", "Reviews"], ["/faq", "FAQ"], ["/about", "About"], ["/contact", "Contact"]];
 const LEGAL = [["/policies", "Company policies"], ["/privacy", "Privacy policy"], ["/cookies", "Cookie policy"], ["/terms", "Terms & conditions"]];
 
 export const BookBtn = ({ children = "Book a Cleaning", className = "", testid = "book-cleaning-btn" }) => (
   <Link to="/quote" data-testid={testid} className={`inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold text-white transition-transform hover:-translate-y-0.5 ${className}`} style={{ background: G }}>{children}</Link>
 );
-export const tel = (phone) => `tel:${(phone || "").replace(/\s/g, "")}`;
+export const tel = (phone) => { const d = (phone || "").replace(/[^\d+]/g, ""); return `tel:${d.startsWith("0") ? `+44${d.slice(1)}` : d}`; };
+
+export function CallDialog({ phone }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const onClick = (e) => {
+      const a = e.target.closest?.('a[href^="tel:"]');
+      if (!a || a.dataset.direct || window.matchMedia("(pointer: coarse)").matches) return;
+      e.preventDefault();
+      setOpen(true);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
+  const copy = async () => { try { await navigator.clipboard.writeText(phone); toast.success("Number copied"); } catch { toast.error(`Please dial ${phone}`); } };
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-w-sm text-center" data-testid="call-dialog">
+        <DialogHeader><DialogTitle className="text-center">Call Solid Clean Ltd</DialogTitle><DialogDescription className="text-center">Speak to our team on</DialogDescription></DialogHeader>
+        <p className="font-mono text-3xl font-bold" style={{ color: G }} data-testid="call-dialog-number">{phone}</p>
+        <div className="mt-2 flex flex-col gap-2">
+          <button type="button" onClick={copy} className="flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold text-white" style={{ background: G }} data-testid="call-dialog-copy-btn"><Copy className="h-4 w-4" />Copy number</button>
+          <a href={tel(phone)} data-direct="1" className="rounded-full border-2 py-3 text-sm font-semibold" style={{ borderColor: GOLD, color: G }} data-testid="call-dialog-call-btn">Call with a calling app</a>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 export const CallBtn = ({ phone, className = "", testid = "call-btn", label }) => (
   <a href={tel(phone)} data-testid={testid} className={`inline-flex items-center justify-center gap-2 rounded-full border-2 px-6 py-3 text-sm font-semibold transition-colors hover:bg-[#8F7E22]/10 ${className}`} style={{ borderColor: GOLD, color: G }}><Phone className="h-4 w-4" />{label || `Call ${phone}`}</a>
 );
@@ -95,7 +124,8 @@ export default function SiteLayout() {
       <Header b={cfg.business} />
       <Outlet context={cfg} />
       <Footer b={cfg.business} />
-      {cfg.business.phone && !loc.pathname.startsWith("/quote") && !loc.pathname.startsWith("/commercial-cleaning/request") && <MobileCallBar b={cfg.business} />}
+      {cfg.business.phone && !loc.pathname.startsWith("/quote") && !loc.pathname.startsWith("/commercial-cleaning/request") && !loc.pathname.startsWith("/carpet-cleaning/request") && <MobileCallBar b={cfg.business} />}
+      {cfg.business.phone && <CallDialog phone={cfg.business.phone} />}
       {cfg.ai_receptionist && <ChatWidget />}
     </div>
   );

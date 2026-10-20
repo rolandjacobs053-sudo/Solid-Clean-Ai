@@ -59,7 +59,7 @@ def _booking_body(cfg, postcode="SW1A 1AA"):
             "contact": {"name": f"TEST_iter5_{uuid.uuid4().hex[:5]}", "email": "delivered@resend.dev", "phone": "07700900111"},
             "date": day, "slot": slot, "access": {"method": "customer_present"},
             "accepted_policies": {p["key"]: p["published_version"] for p in cfg["policies"] if p.get("require_acceptance")},
-            "origin_url": BASE, "source": "website", "photos": []}
+            "pay_terms_accepted": True, "origin_url": BASE, "source": "website", "photos": []}
 
 
 # --- Full upfront payment ---

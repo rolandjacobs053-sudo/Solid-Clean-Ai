@@ -236,6 +236,8 @@ async def create_booking(body: BookingIn):
         raise HTTPException(409, "Please review and accept the current booking terms and policies.")
     if not body.pay_terms_accepted:
         raise HTTPException(409, "Please confirm you accept the Terms and Conditions before paying.")
+    if q["service"] == "carpet":
+        raise HTTPException(422, "Carpet cleaning is quoted after we review your request. Please use the carpet cleaning quote form.")
     if result["status"] != "ok":
         raise HTTPException(422, "This booking needs a quick review by our team: " + " ".join(result["reasons"]))
     if len(q["address"].strip()) < 5:
@@ -350,6 +352,9 @@ async def settle_tip(tx: dict):
 
 async def settle_tx(tx: dict, booking_id: str):
     kind = tx.get("kind")
+    if kind == "carpet":
+        from routes_carpet import settle_carpet
+        return await settle_carpet(tx)
     await (settle_balance(tx) if kind == "balance" else settle_tip(tx) if kind == "tip" else finalize_booking(booking_id))
 
 

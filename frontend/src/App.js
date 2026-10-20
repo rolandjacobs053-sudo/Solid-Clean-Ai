@@ -38,6 +38,10 @@ import SiteLayout from "@/pages/site/SiteLayout";
 import CommercialPage from "@/pages/site/CommercialPage";
 import CommercialRequest from "@/pages/site/CommercialRequest";
 import Walkthroughs from "@/pages/admin/Walkthroughs";
+import CarpetQuotes from "@/pages/admin/CarpetQuotes";
+import CarpetPage from "@/pages/site/CarpetPage";
+import CarpetRequest from "@/pages/site/CarpetRequest";
+import CarpetQuoteView from "@/pages/site/CarpetQuoteView";
 import { AboutPage, AreasPage, ContactPage, FaqPage, HomePage, PolicyPage, ReviewsPage, ServiceDetail, ServicesPage } from "@/pages/site/SitePages";
 import Policies from "@/pages/admin/Policies";
 import PublicPolicies from "@/pages/PublicPolicies";
@@ -95,6 +99,10 @@ function App() {
               <Route path="/services/commercial" element={<Navigate to="/commercial-cleaning" replace />} />
               <Route path="/commercial-cleaning" element={<CommercialPage />} />
               <Route path="/commercial-cleaning/request" element={<CommercialRequest />} />
+              <Route path="/services/carpet" element={<Navigate to="/carpet-cleaning" replace />} />
+              <Route path="/carpet-cleaning" element={<CarpetPage />} />
+              <Route path="/carpet-cleaning/request" element={<CarpetRequest />} />
+              <Route path="/carpet-cleaning/quote/:id" element={<CarpetQuoteView />} />
               <Route path="/services/:key" element={<ServiceDetail />} />
               <Route path="/quote" element={<QuotePage />} />
               <Route path="/book" element={<Navigate to="/quote" replace />} />
@@ -128,6 +136,7 @@ function App() {
               <Route path="bookings" element={<Bookings />} />
               <Route path="schedule" element={<Schedule />} />
               <Route path="walkthroughs" element={<Walkthroughs />} />
+              <Route path="carpet-quotes" element={<CarpetQuotes />} />
               <Route path="receptionist" element={<Conversations />} />
               <Route path="outreach" element={<Outreach />} />
               <Route path="reviews" element={<Reviews />} />

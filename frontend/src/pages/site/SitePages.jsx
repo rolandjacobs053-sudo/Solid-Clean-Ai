@@ -14,7 +14,7 @@ const IMG = {
   standard: "https://images.unsplash.com/photo-1639173925921-5d5fd027713c?crop=entropy&cs=srgb&fm=jpg&q=80&w=1000",
   regular: "https://images.unsplash.com/photo-1639173925921-5d5fd027713c?crop=entropy&cs=srgb&fm=jpg&q=80&w=1000",
   end_of_tenancy: "https://images.unsplash.com/photo-1564078516393-cf04bd966897?crop=entropy&cs=srgb&fm=jpg&q=80&w=1000",
-  carpet: "https://images.unsplash.com/photo-1558317374-067fb5f30001?crop=entropy&cs=srgb&fm=jpg&q=80&w=1000",
+  carpet: "/carpet/hero.jpg",
   commercial: "https://images.unsplash.com/photo-1662261896193-b4f8a02a9773?crop=entropy&cs=srgb&fm=jpg&q=80&w=1000",
 };
 const FALLBACK = { standard: "Routine cleaning to keep your home fresh and tidy.", regular: "A fresh, clean home without the hassle - every corner taken care of.", commercial: "Hygienic, welcoming offices and workspaces.",
@@ -34,12 +34,12 @@ function ServiceGrid({ cfg }) {
   return (
     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
       {services(cfg).map((s) => (
-        <Link key={s.key} to={`/services/${s.key}`} className="group overflow-hidden rounded-3xl border border-slate-200 bg-white transition-transform hover:-translate-y-1" data-testid={`site-service-${s.key}`}>
+        <Link key={s.key} to={s.key === "carpet" ? "/carpet-cleaning" : `/services/${s.key}`} className="group overflow-hidden rounded-3xl border border-slate-200 bg-white transition-transform hover:-translate-y-1" data-testid={`site-service-${s.key}`}>
           <img src={IMG[s.key] || IMG.regular} alt={s.name} className="h-44 w-full object-cover" />
           <div className="p-6">
             <h3 className="font-display text-lg font-semibold" style={{ color: G }}>{s.name}</h3>
             <p className="mt-2 text-sm text-slate-600">{desc(s)}</p>
-            <p className="mt-3 font-mono text-sm" style={{ color: GOLD }}>{s.requires_survey ? "Quote after survey" : `From ${gbp(s.pricing_mode === "per_room" ? s.min_price : s.fixed_price)}`}</p>
+            <p className="mt-3 font-mono text-sm" style={{ color: GOLD }}>{s.from_price ? `Prices from ${gbp(s.from_price)}` : s.requires_survey ? "Quote after survey" : `From ${gbp(s.pricing_mode === "per_room" ? s.min_price : s.fixed_price)}`}</p>
           </div>
         </Link>
       ))}

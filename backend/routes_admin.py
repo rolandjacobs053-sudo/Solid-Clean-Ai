@@ -213,7 +213,7 @@ async def cancel_refund(booking_id: str, body: RefundIn):
         raise HTTPException(400, f"The refund can't be more than the £{rule['paid']:.2f} the customer paid")
     refund = {**rule, "amount": round(body.amount, 2), "note": body.note.strip(), "status": "to_issue_in_stripe",
               "recorded_at": now_iso(), "recorded_by": current_actor.get()}
-    res = await tdb.bookings.update_one({"_id": b["_id"], "status": "confirmed"}, {"$set": {"status": "cancelled", "refund": refund, "updated_at": now_iso()}})
+    res = await tdb.bookings.update_one({"_id": b["_id"], "status": "confirmed"}, {"$set": {"status": "cancelled", "refund": refund, "updated_at": now_iso(), **({"payment_status": "refund_due"} if refund["amount"] > 0 else {})}})
     if not res.modified_count:
         raise HTTPException(409, "This booking has already changed - please refresh")
     await _cancel_effects(b, refund)

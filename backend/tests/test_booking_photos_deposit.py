@@ -63,7 +63,7 @@ def _booking_body(cfg, **over):
             "date": day, "slot": slot, "access": {"method": "estate_agency", "agency_name": "TEST_ Agency", "agency_address": "1 High St",
                                                   "agency_instructions": "Ask for keys at desk"},
             "accepted_policies": {p["key"]: p["published_version"] for p in cfg["policies"] if p.get("require_acceptance")},
-            "origin_url": BASE, "source": "website", "photos": []}
+            "pay_terms_accepted": True, "origin_url": BASE, "source": "website", "photos": []}
     for k, v in over.items():
         body[k] = v
     return body

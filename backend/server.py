@@ -25,6 +25,7 @@ import routes_tools
 import routes_voice
 import routes_photos
 import routes_walkthrough
+import routes_carpet
 import storage
 from automations import run_all_companies
 from core import client
@@ -35,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="CleanOps")
 for r in (routes_auth.router, routes_saas.router, routes_saas.platform, routes_public.router, routes_public.public, routes_chat.router,
-          routes_admin.router, routes_growth.router, routes_growth.outreach, routes_growth.reviews_r, routes_tools.router, routes_policies.router, routes_voice.router, routes_voice.admin, routes_photos.public, routes_photos.admin, routes_walkthrough.public, routes_walkthrough.admin):
+          routes_admin.router, routes_growth.router, routes_growth.outreach, routes_growth.reviews_r, routes_tools.router, routes_policies.router, routes_voice.router, routes_voice.admin, routes_photos.public, routes_photos.admin, routes_walkthrough.public, routes_walkthrough.admin, routes_carpet.public, routes_carpet.admin):
     app.include_router(r)
 
 HITS = defaultdict(deque)

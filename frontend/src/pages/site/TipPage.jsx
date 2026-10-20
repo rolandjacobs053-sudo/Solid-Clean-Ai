@@ -16,6 +16,7 @@ export default function TipPage() {
   const t = params.get("t") || "";
   const [info, setInfo] = useState(null);
   const [amount, setAmount] = useState(10);
+  const [custom, setCustom] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     api.get(`${pub}/tips/${bookingId}`, { params: { t } }).then((r) => setInfo(r.data)).catch(() => setInfo("invalid"));
@@ -38,10 +39,10 @@ export default function TipPage() {
       <p className="mt-4 text-slate-600">For your {info.service_name} on <b>{fmtDate(info.date)}</b>{info.cleaner ? <> with <b>{info.cleaner}</b></> : null}. Tipping is entirely optional.</p>
       {info.tips_received > 0 && <p className="mt-3 rounded-xl bg-[#023F00]/5 p-3 text-sm text-[#023F00]" data-testid="tip-already">You've already left {gbp(info.tips_received)} - thank you!</p>}
       <div className="mt-8 flex flex-wrap gap-3">
-        {AMOUNTS.map((a) => <button key={a} type="button" className={pill(amount === a)} onClick={() => setAmount(a)} data-testid={`tip-amount-${a}`}>{gbp(a)}</button>)}
+        {AMOUNTS.map((a) => <button key={a} type="button" className={pill(!custom && amount === a)} onClick={() => { setCustom(false); setAmount(a); }} data-testid={`tip-amount-${a}`}>{gbp(a)}</button>)}
       </div>
       <div className="mt-4 flex items-center gap-2"><span className="text-sm text-slate-500">Or enter an amount (£)</span>
-        <Input type="number" min="1" max="500" value={amount || ""} onChange={(e) => setAmount(Math.min(500, Math.max(0, Number(e.target.value) || 0)))} className="w-32 font-mono" data-testid="tip-custom-amount" /></div>
+        <Input type="number" min="1" max="500" value={amount || ""} onChange={(e) => { setCustom(true); setAmount(Math.min(500, Math.max(0, Number(e.target.value) || 0))); }} className="w-32 font-mono" data-testid="tip-custom-amount" /><span className="text-xs text-slate-400">max £500</span></div>
       <Button disabled={busy || amount < 1} onClick={pay} className="mt-8 h-12 rounded-full bg-[#023F00] px-8 text-base text-white hover:bg-[#8F7E22]" data-testid="tip-pay-btn">
         {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Pay {gbp(amount || 0)} tip securely
       </Button>

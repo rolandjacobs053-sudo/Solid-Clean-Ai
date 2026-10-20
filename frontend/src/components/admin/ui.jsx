@@ -41,6 +41,7 @@ const TONES = {
   scheduled: "bg-sky-100 text-sky-800", interested: "bg-teal-100 text-teal-800", meeting: "bg-emerald-100 text-emerald-800",
   won: "bg-emerald-600 text-white", contacted: "bg-amber-100 text-amber-800", draft_ready: "bg-amber-100 text-amber-800",
   approved: "bg-emerald-100 text-emerald-800", responded: "bg-emerald-100 text-emerald-800", resolved: "bg-slate-200 text-slate-600",
+  awaiting_review: "bg-orange-100 text-orange-800", awaiting_approval: "bg-orange-100 text-orange-800", declined: "bg-slate-200 text-slate-600", refund_due: "bg-red-100 text-red-700", unpublished: "bg-slate-200 text-slate-600",
 };
 
 export const StatusBadge = ({ status, testid }) => (
