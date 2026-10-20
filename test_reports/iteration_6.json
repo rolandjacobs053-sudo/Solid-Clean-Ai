@@ -1,0 +1,36 @@
+{
+  "summary": "Frontend-only test (continuation of iteration 5). All requested flows PASSED on desktop 1920x800 and mobile 390x844: commercial walkthrough request ?type=pub full 6-step flow (photo upload, visit date/time, details, address+postcode at end, confirmation text exact), ?type=xyz starts at step 1; admin /admin/walkthroughs sheet shows readable labels, photo grid (1 img loaded), requested visit; mobile admin sign-out works; residential /quote Regular flow (no address on property step, address/postcode required at step 6 with invalid postcode message, terms acceptance, review shows address + full total, 'Pay £87.00 & confirm' with no deposit, redirect to checkout.stripe.com); End of Tenancy flow (furnished/flooring on property step, address at end, 'Pay £240.00 & confirm'); Commercial service on /quote shows walkthrough link to /commercial-cleaning/request; mobile /quote no overflow on any step, stepper scrolls active step into view, mobile call bar hidden on /quote.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Admin Walkthroughs detail - Premises answers", "issue": "'Type of cleaning required' shows raw enum key ('regular'/'deep') instead of label 'Regular contract cleaning'. cleaning_type is not in ENUM_KEYS and FIELD values are not mapped to CLEAN_TYPES labels.", "selector": "[data-testid='walkthrough-answers']", "priority": "LOW"},
+      {"component": "CommercialRequest confirmation", "issue": "After submit the page is not scrolled to top; the confirmation card's top (check icon) sits under the sticky header on desktop.", "selector": "[data-testid='walkthrough-confirmation']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Commercial request steps 2 & 4", "issues": ["Visit date / start date / alt date use native browser date input (mm/dd/yyyy US format) while /quote uses the shadcn Calendar - inconsistent layout and US date format for a UK business"]},
+      {"screen": "/quote SlotPicker", "issues": ["Selected slot and calendar today/selected day use teal colours (border-teal-600/bg-teal-50) - off-brand vs Solid Clean green #023F00 / gold #8F7E22"]},
+      {"screen": "Commercial request mobile", "issues": ["Mobile call bar + floating chat button are shown on /commercial-cleaning/request (hidden only on /quote); chat bubble overlaps form inputs while scrolling. Consider hiding on the request form too for consistency"]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Map cleaning_type (and frequency) values to human labels in admin walkthrough detail",
+    "Scroll to top when walkthrough confirmation shows",
+    "Optional: replace native date inputs in CommercialRequest with shadcn Calendar/Popover (UK format) for consistency with /quote",
+    "Optional: replace teal slot/calendar colours with brand colours; hide mobile call bar on /commercial-cleaning/request"
+  ],
+  "critical_code_review_comments": [
+    "Walkthroughs.jsx: import of '@/lib/api' placed after `const ENUM_KEYS` declaration (works due to hoisting but violates import/first lint)",
+    "QuotePage: label logic still supports deposit (`deposit < total`); backend preview currently returns deposit == total so full payment is shown - fine, but deposit code paths in QuotePage/StepReview are dead code if deposits are no longer a business rule",
+    "Postcode validation /^[A-Za-z]{1,2}\\d/ is very loose (e.g. 'N1' or 'A1XXXX' passes); consider full UK postcode regex",
+    "End of Tenancy: 'Is the property furnished?' is not required - Continue enabled without a choice (review then shows no Furnished row)"
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (frontend only)", "frontend": "100% of requested flows passed; 2 low-priority UI bugs + design notes"},
+  "test_credentials": "admin@solidcleanltd.com / SolidClean#2026 (from /app/memory/test_credentials.md) - worked",
+  "seed_data_creation": "Created and then DELETED from Mongo: 1 walkthrough (TEST_ Pub Co), 1 pending booking + 1 lead + 1 quote (TEST_ Resi Tester; Stripe checkout session left unpaid). Walkthrough photo doc 6ad78bfae105afd6e0a7ebf6 soft-deleted (is_deleted=true; object-storage file remains). Two older pending photos from the previous run (created 14:51) remain and will expire via the 24h automation.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Commercial flow testids: wt-cleaning-type-*, wt-frequency-*, wt-<k>-count-plus/minus, photo-file-input, wt-visit-date (native date input, fill ISO yyyy-mm-dd), wt-visit-time-HH:MM, wt-business-name/contact-name/contact-email/contact-phone, wt-address, wt-postcode, wt-submit-btn. Quote calendar days: [data-testid=quote-calendar] button[name=day]:not([disabled]); slots [data-testid^=quote-slot-]; terms checkbox quote-accept-terms. No admin delete endpoints for walkthroughs/bookings - clean via Mongo."
+}

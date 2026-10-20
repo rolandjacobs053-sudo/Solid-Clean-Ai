@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,7 +25,7 @@ export function Pills({ options, value, onChange, testid }) {
 export function StepService({ services, form, set }) {
   return (
     <>
-    {form.service === "commercial" && <a href="/commercial-cleaning/request" className="block rounded-2xl border-2 border-[#8F7E22] bg-[#fbf9f1] p-4 text-sm font-semibold text-[#023F00]" data-testid="quote-commercial-walkthrough-link">Commercial premises are priced after a free, no-obligation site walkthrough. Book a free site walkthrough →</a>}
+    {form.service === "commercial" && <Link to="/commercial-cleaning/request" className="block rounded-2xl border-2 border-[#8F7E22] bg-[#fbf9f1] p-4 text-sm font-semibold text-[#023F00]" data-testid="quote-commercial-walkthrough-link">Commercial premises are priced after a free, no-obligation site walkthrough. Book a free site walkthrough →</Link>}
     <div className="grid gap-3 sm:grid-cols-2" data-testid="quote-service-options">
       {services.map((s) => <ChoiceCard key={s.key} active={form.service === s.key} onClick={() => set("service", s.key)} title={s.name}
         sub={s.requires_survey ? "Priced after a short survey" : `From ${gbp(s.min_price)}${isEot(s.key) ? " · move-out clean" : s.key === "regular" ? " · routine home clean" : ""}`} testid={`quote-service-${s.key}`} />)}

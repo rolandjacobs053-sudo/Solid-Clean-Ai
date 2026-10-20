@@ -39,6 +39,7 @@ const VISIT_TIMES = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:0
 const COUNTS = [["floors", "Floors"], ["rooms", "Rooms / main areas"], ["toilets", "Toilets & washrooms"], ["kitchens", "Kitchens / staff rooms"]];
 export const FIELD_LABELS = Object.fromEntries([...COUNTS, ...Object.values(EXTRA).flat(), ["cleaning_type", "Type of cleaning required"], ["size", "Size of the property"],
   ["other_areas", "Other relevant areas"], ["attention", "Areas requiring particular attention"], ["special", "Additional cleaning requirements"], ["condition", "Current condition"], ["flooring", "Flooring types"]]);
+export const VALUE_LABELS = Object.fromEntries([...CLEAN_TYPES, ["good", "Well maintained"], ["average", "Average"], ["needs_attention", "Needs extra attention"]]);
 const STEPS = ["Premises", "Requirements", "Photos", "Site visit", "Your details", "Address"];
 const TITLES = ["What type of premises?", "Your cleaning requirements", "Upload Photos of Your Premises", "When Would You Like Us to Visit?", "Your contact details", "Premises address"];
 const CONFIRM = "Thank you for contacting Solid Clean Ltd. We have received your request for a free commercial cleaning site walkthrough. Our team will review your details and contact you to confirm a suitable date and time. The walkthrough is free and there is no obligation to proceed.";
@@ -94,6 +95,7 @@ export default function CommercialRequest() {
         schedule: { ...sch, kind: sch.frequency === "one_off" || det.cleaning_type === "deep" ? "one_off" : "ongoing" }, visit, marketing_consent: consent,
         photos: photos.filter((p) => p.status === "done").map(({ id, token }) => ({ id, token })) });
       setDone(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) { toast.error(errMsg(e)); }
     setBusy(false);
   };

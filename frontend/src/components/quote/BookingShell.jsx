@@ -26,11 +26,11 @@ export function BookingShell({ prefix, eyebrow, title, steps, step, phone, aside
   );
 }
 
-export function StepNav({ prefix, step, last, setStep, canNext, hint, nextLabel = "Continue", children }) {
+export function StepNav({ prefix, step, last, setStep, canNext, hint, nextLabel = "Continue", onNext, children }) {
   return (
     <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-6">
       {step > 0 && <Button variant="ghost" onClick={() => setStep(step - 1)} data-testid={`${prefix}-back-btn`}><ArrowLeft className="mr-1 h-4 w-4" />Back</Button>}
-      {step < last && <Button disabled={!canNext} onClick={() => setStep(step + 1)} className="rounded-full bg-[#023F00] px-7 text-white hover:bg-[#8F7E22]" data-testid={`${prefix}-next-btn`}>{nextLabel}<ArrowRight className="ml-1 h-4 w-4" /></Button>}
+      {step < last && <Button disabled={!canNext} onClick={() => (onNext ? onNext() : setStep(step + 1))} className="rounded-full bg-[#023F00] px-7 text-white hover:bg-[#8F7E22]" data-testid={`${prefix}-next-btn`}>{nextLabel}<ArrowRight className="ml-1 h-4 w-4" /></Button>}
       {children}
       {!canNext && hint && <span className="text-xs text-slate-500" data-testid={`${prefix}-step-hint`}>{hint}</span>}
     </div>

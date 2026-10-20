@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Textarea } from "@/components/ui/textarea";
 import { Empty, PageHeader, StatusBadge, useLoad } from "@/components/admin/ui";
 import { PhotoGrid } from "@/components/admin/BookingDetail";
-import { FIELD_LABELS } from "@/pages/site/CommercialRequest";
+import { FIELD_LABELS, VALUE_LABELS } from "@/pages/site/CommercialRequest";
 
 const ENUM_KEYS = ["condition"];
 import { api, errMsg, fmtDate, fmtDateTime } from "@/lib/api";
@@ -52,7 +52,7 @@ function Detail({ id, reload }) {
       <Sec title="Business & contact"><R k="Business" v={w.business_name} raw /><R k="Premises type" v={w.establishment_name} raw /><R k="Contact" v={w.contact.name} raw />
         <R k="Phone" v={w.contact.phone} raw /><R k="Email" v={w.contact.email} raw /><R k="Address" v={`${w.address}, ${w.postcode}`} raw />
         <div className="mt-2 flex gap-2"><a className="text-xs underline" href={`tel:${w.contact.phone}`}>Call</a><a className="text-xs underline" href={`mailto:${w.contact.email}`}>Email</a></div></Sec>
-      <Sec title="Premises answers" testid="walkthrough-answers">{Object.entries(w.details || {}).map(([k, x]) => <R key={k} k={FIELD_LABELS[k] || nice(k)} v={x} raw={!ENUM_KEYS.includes(k)} />)}</Sec>
+      <Sec title="Premises answers" testid="walkthrough-answers">{Object.entries(w.details || {}).map(([k, x]) => <R key={k} k={FIELD_LABELS[k] || nice(k)} v={VALUE_LABELS[x] || x} raw={!ENUM_KEYS.includes(k)} />)}</Sec>
       <Sec title="Cleaning requirements"><R k="Type" v={s.kind} /><R k="Frequency" v={s.frequency} /><R k="Days" v={s.days} /><R k="Time" v={s.time} /><R k="Preferred start" v={s.start_date && fmtDate(s.start_date)} raw /><R k="Notes" v={s.notes} raw /></Sec>
       <Sec title={`Photos (${d.photos.length})`} testid="walkthrough-photos"><PhotoGrid photos={d.photos} /></Sec>
       <Actions w={w} reload={() => { load(); reload(); }} />
