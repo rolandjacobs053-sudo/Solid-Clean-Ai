@@ -14,7 +14,7 @@ import { StepAccess, StepContact, StepReview, StepTerms, accessOk } from "@/comp
 
 const STEPS = ["Service", "Property", "Photos", "Extras", "Access", "Date & details", "Terms", "Review"];
 const TITLES = ["Which cleaning service do you need?", "Tell us about the property", "Show us the property", "Any additional services?", "How will we access the property?", "Choose a time, your details & address", "Booking terms & policies", "Check your booking"];
-const INITIAL = { service: "regular", property_type: "flat", bedrooms: 2, bathrooms: 1, living_rooms: 1, condition: "good", extras: [], postcode: "", promo_code: "",
+const INITIAL = { service: "regular", property_type: "flat", bedrooms: 2, bathrooms: 1, living_rooms: 1, condition: "good", extras: [], extra_qty: {}, postcode: "", promo_code: "",
   address: "", furnished: "", pets: "no", pet_hair_odour: false, additional_areas: [], flooring: "", property_notes: "" };
 const ACCESS0 = { method: "customer_present", person_name: "", person_phone: "", agency_name: "", agency_address: "", agency_instructions: "", notes: "" };
 
@@ -87,10 +87,10 @@ export default function QuotePage() {
   return (
     <BookingShell prefix="quote" eyebrow="Book online" title={TITLES[step]} steps={STEPS} step={step} phone={config.business.phone}
       aside={<QuoteSummary preview={preview} form={form} date={!needsReview && date} slot={slot} config={config} />}>
-          {step === 0 && <StepService services={p.services} form={form} set={(k, v) => setForm((f) => ({ ...f, [k]: v, extras: [] }))} />}
+          {step === 0 && <StepService services={p.services} form={form} set={(k, v) => setForm((f) => ({ ...f, [k]: v, extras: [], extra_qty: {} }))} />}
           {step === 1 && <StepProperty p={p} form={form} set={set} />}
           {step === 2 && <PhotoUploader pub={pub} photos={photos} setPhotos={setPhotos} />}
-          {step === 3 && <StepExtras p={p} svc={svc} form={form} set={set} />}
+          {step === 3 && <StepExtras p={p} svc={svc} form={form} set={set} preview={preview} />}
           {step === 4 && <StepAccess access={access} setAccess={setAccess} />}
           {step === 5 && <StepContact config={config} needsReview={needsReview} date={date} setDate={setDate} slot={slot} setSlot={setSlot} contact={contact} setContact={setContact} form={form} set={set} preview={preview} postcodeOk={postcodeOk} />}
           {step === 6 && <StepTerms policies={policies} base={base} accepted={accepted} setAccepted={setAccepted} needsReview={needsReview} />}

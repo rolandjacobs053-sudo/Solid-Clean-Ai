@@ -118,10 +118,12 @@ def compute_quote(pricing: dict, q: dict, public: bool = True) -> dict:
     allowed = svc["extras"] or [e["key"] for e in pricing["extras"]]
     chosen = [k for k in dict.fromkeys(q.get("extras") or []) if k in allowed and _find(pricing["extras"], k)]
     excluded = {x for k in chosen for x in _find(pricing["extras"], k).get("excludes", [])}
+    qtys = q.get("extra_qty") or {}
     for key in chosen:
         if key not in excluded:
             extra = _find(pricing["extras"], key)
-            lines.append({"label": extra["name"], "amount": extra["price"]})
+            n = max(1, min(int(qtys.get(key) or 1), int(extra.get("max_qty") or 20))) if extra.get("per_item") else 1
+            lines.append({"label": extra["name"] + (f" × {n}" if extra.get("per_item") else ""), "amount": round(extra["price"] * n, 2)})
     total = round(sum(line["amount"] for line in lines), 2)
     if total < svc["min_price"]:
         lines.append({"label": "Minimum booking value top-up", "amount": round(svc["min_price"] - total, 2)})

@@ -3,7 +3,7 @@ import logging
 import secrets
 import os
 from datetime import timedelta, date
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -42,6 +42,7 @@ class QuoteIn(BaseModel):
     living_rooms: int = Field(1, ge=0, le=6)
     condition: str = "good"
     extras: List[str] = []
+    extra_qty: Dict[str, int] = Field({}, max_length=40)
     postcode: str = ""
     date: str = ""
     promo_code: str = ""

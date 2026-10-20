@@ -72,6 +72,32 @@ export function ServicesEditor({ pricing, setP }) {
   );
 }
 
+export function ExtrasEditor({ pricing, setP }) {
+  const rows = pricing.extras;
+  const set = (i, k, v) => setP("extras", rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+  const add = () => setP("extras", [...rows, { key: `extra_${Date.now().toString(36)}`, name: "New extra", price: 0 }]);
+  return (
+    <Panel title="Extras (£) - shown on the booking form">
+      <div className="space-y-2" data-testid="settings-extras">
+        {rows.map((r, i) => (
+          <div key={r.key} className="grid grid-cols-12 items-center gap-2 border-t border-slate-100 pt-2">
+            <Input className="col-span-12 sm:col-span-4" value={r.name} onChange={(e) => set(i, "name", e.target.value)} data-testid={`settings-extras-${r.key}-name`} />
+            <Input className="col-span-3 font-mono sm:col-span-2" type="number" step="0.01" value={r.price} onChange={(e) => set(i, "price", Number(e.target.value || 0))} data-testid={`settings-extras-${r.key}-price`} />
+            <label className="col-span-4 flex items-center gap-1.5 text-xs sm:col-span-2"><Switch checked={!!r.per_item} onCheckedChange={(v) => set(i, "per_item", v)} data-testid={`settings-extras-${r.key}-per-item`} />Per item</label>
+            {r.per_item ? <>
+              <Input className="col-span-3 sm:col-span-2" placeholder="unit e.g. blind" value={r.unit || ""} onChange={(e) => set(i, "unit", e.target.value)} data-testid={`settings-extras-${r.key}-unit`} />
+              <Input className="col-span-2 font-mono sm:col-span-1" type="number" min="1" title="Max quantity" value={r.max_qty || 20} onChange={(e) => set(i, "max_qty", Number(e.target.value || 1))} />
+            </> : <span className="col-span-5 sm:col-span-3" />}
+            <Button size="icon" variant="ghost" className="col-span-12 justify-self-end sm:col-span-1" onClick={() => setP("extras", rows.filter((_, j) => j !== i))} data-testid={`settings-extras-${r.key}-remove`}><Trash2 className="h-4 w-4" /></Button>
+          </div>
+        ))}
+        <Button size="sm" variant="outline" onClick={add} data-testid="settings-extras-add"><Plus className="mr-1 h-4 w-4" />Add extra</Button>
+        <p className="text-xs text-slate-500">Per item extras show a quantity selector to customers (e.g. 4 blinds × £8). Tick which extras each service offers in the service cards above.</p>
+      </div>
+    </Panel>
+  );
+}
+
 export function RulesEditor({ pricing, setP }) {
   const sn = pricing.short_notice || { days: 2, type: "percent", value: 0 };
   const promos = pricing.promo_codes || [];

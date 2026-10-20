@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader, Panel, useLoad } from "@/components/admin/ui";
-import { RulesEditor, ServicesEditor } from "@/components/admin/PricingEditors";
+import { ExtrasEditor, RulesEditor, ServicesEditor } from "@/components/admin/PricingEditors";
 import { api, errMsg, fmtDateTime, label } from "@/lib/api";
 
 function History() {
@@ -85,12 +85,12 @@ export default function Settings() {
           <div className="grid gap-6 lg:grid-cols-2">
             <Panel title="Property type multipliers"><NumTable rows={p.property_types} fields={["multiplier"]} onChange={editRow("property_types")} testid="settings-ptypes" /></Panel>
             <Panel title="Condition multipliers"><NumTable rows={p.conditions} fields={["multiplier", "requires_review"]} onChange={editRow("conditions")} testid="settings-conditions" /></Panel>
-            <Panel title="Extras (£)"><NumTable rows={p.extras} fields={["price"]} onChange={editRow("extras")} testid="settings-extras" /></Panel>
             <Panel title="Service areas">
               <Label className="block">Service area postcode prefixes (comma separated, empty = no restriction)</Label>
               <Input className="mt-1 font-mono" value={p.service_area_prefixes.join(", ")} onChange={(e) => setP("service_area_prefixes", list(e.target.value.toUpperCase()))} data-testid="settings-area-input" />
             </Panel>
           </div>
+          <ExtrasEditor pricing={p} setP={setP} />
         </TabsContent>
         <TabsContent value="rules"><RulesEditor pricing={p} setP={setP} /></TabsContent>
         <TabsContent value="history"><History /></TabsContent>

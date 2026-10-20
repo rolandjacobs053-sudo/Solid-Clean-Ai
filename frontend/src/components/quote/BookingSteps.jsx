@@ -75,7 +75,17 @@ export function StepProperty({ p, form, set }) {
   );
 }
 
-export function StepExtras({ p, svc, form, set }) {
+const Qty = ({ x, n, setN }) => (
+  <span className="mt-2 inline-flex items-center gap-2" onClick={(e) => e.preventDefault()} data-testid={`quote-extra-qty-${x.key}`}>
+    <button type="button" className="h-7 w-7 rounded-full border border-slate-300 font-bold text-[#023F00] disabled:opacity-40" disabled={n <= 1} onClick={() => setN(n - 1)} data-testid={`quote-extra-qty-minus-${x.key}`}>−</button>
+    <span className="min-w-[2.5rem] text-center font-mono text-sm" data-testid={`quote-extra-qty-value-${x.key}`}>{n}</span>
+    <button type="button" className="h-7 w-7 rounded-full border border-slate-300 font-bold text-[#023F00] disabled:opacity-40" disabled={n >= (x.max_qty || 20)} onClick={() => setN(n + 1)} data-testid={`quote-extra-qty-plus-${x.key}`}>+</button>
+    <span className="text-xs text-slate-500">× {x.unit || "item"}</span>
+  </span>
+);
+
+export function StepExtras({ p, svc, form, set, preview }) {
+  const qty = form.extra_qty || {};
   const allowed = svc?.extras?.length ? p.extras.filter((x) => svc.extras.includes(x.key)) : p.extras;
   const excluded = new Set(form.extras.flatMap((k) => p.extras.find((x) => x.key === k)?.excludes || []));
   const toggle = (x, on) => {
@@ -92,14 +102,16 @@ export function StepExtras({ p, svc, form, set }) {
             <label key={x.key} className={`flex cursor-pointer items-start justify-between gap-3 rounded-2xl border bg-white px-4 py-3 text-sm transition-colors ${form.extras.includes(x.key) ? "border-[#023F00]" : "border-slate-200 hover:border-[#8F7E22]"} ${off ? "opacity-50" : ""}`}>
               <span className="flex items-start gap-3">
                 <Checkbox className="mt-0.5" disabled={off} checked={form.extras.includes(x.key) && !off} onCheckedChange={(c) => toggle(x, !!c)} data-testid={`quote-extra-${x.key}`} />
-                <span><span className="font-medium text-slate-900">{x.name}</span>{x.description && <span className="mt-0.5 block text-xs text-slate-500">{x.description}</span>}{off && <span className="mt-0.5 block text-xs text-[#8F7E22]">Included in Freezer defrost</span>}</span>
+                <span><span className="font-medium text-slate-900">{x.name}</span>{x.description && <span className="mt-0.5 block text-xs text-slate-500">{x.description}</span>}{off && <span className="mt-0.5 block text-xs text-[#8F7E22]">Included in Freezer defrost</span>}
+                  {x.per_item && form.extras.includes(x.key) && <Qty x={x} n={qty[x.key] || 1} setN={(n) => set("extra_qty", { ...qty, [x.key]: n })} />}</span>
               </span>
-              <span className="whitespace-nowrap font-mono text-xs text-slate-600">+{gbp(x.price)}</span>
+              <span className="whitespace-nowrap text-right font-mono text-xs text-slate-600">+{gbp(x.per_item && form.extras.includes(x.key) ? x.price * (qty[x.key] || 1) : x.price)}{x.per_item && <span className="block text-[10px] text-slate-400">{gbp(x.price)} per {x.unit || "item"}</span>}</span>
             </label>
           );
         })}
       </div>
       <p className="mt-4 text-xs text-slate-500">Routine tasks such as taps, sinks, toilets and worktops are already part of your clean - no need to add them.</p>
+      {preview?.total != null && <div className="sticky bottom-3 mt-5 flex items-center justify-between rounded-2xl bg-[#023F00] px-5 py-3 text-white shadow-lg" data-testid="extras-running-total"><span className="text-sm">Your price so far</span><span className="font-mono text-lg font-bold">{gbp(preview.total)}</span></div>}
     </div>
   );
 }

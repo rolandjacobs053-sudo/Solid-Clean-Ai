@@ -34,6 +34,29 @@ export const PhotoGrid = ({ photos }) => (
 const Sec = ({ title, children, testid }) => <section className="border-t border-slate-100 pt-4" data-testid={testid}><h3 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-slate-500">{title}</h3>{children}</section>;
 const R = ({ k, v }) => (v || v === 0 ? <div className="flex justify-between gap-4 py-0.5 text-sm"><span className="text-slate-500">{k}</span><span className="text-right font-medium">{v}</span></div> : null);
 
+function SendResults({ b, photos }) {
+  const { user } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [link, setLink] = useState("");
+  if (user.role !== "owner" || !photos.some((p) => p.kind === "after")) return null;
+  const send = async () => {
+    setBusy(true);
+    try {
+      const { data } = await api.post(`/admin/bookings/${b.id}/results/send`);
+      setLink(data.url);
+      toast[data.email_status === "sent" ? "success" : "warning"](data.email_status === "sent" ? "Before & after photos emailed to the customer" : "Link created, but the email could not be sent - copy the link below");
+    } catch (e) { toast.error(errMsg(e)); }
+    setBusy(false);
+  };
+  return (
+    <div className="rounded-xl bg-[#fbf9f1] p-3" data-testid="booking-send-results">
+      <Button size="sm" className="bg-[#023F00] text-white hover:bg-[#8F7E22]" disabled={busy} onClick={send} data-testid="booking-send-results-btn">{busy && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}{b.results_sent_at || link ? "Send to customer again" : "Send to customer"}</Button>
+      <p className="mt-1 text-xs text-slate-500">Emails the customer a private link to their before & after photos.{b.results_sent_at && ` Last sent ${new Date(b.results_sent_at).toLocaleString("en-GB")}.`}</p>
+      {link && <p className="mt-1 break-all font-mono text-xs" data-testid="booking-results-link">{link}</p>}
+    </div>
+  );
+}
+
 function JobPhotos({ b, photos, reload }) {
   const [busy, setBusy] = useState(false);
   const up = async (kind, files) => {
@@ -44,7 +67,7 @@ function JobPhotos({ b, photos, reload }) {
     }
     setBusy(false); reload();
   };
-  return ["before", "after"].map((kind) => (
+  return <>{["before", "after"].map((kind) => (
     <Sec key={kind} title={`${kind} photos (team)`} testid={`booking-${kind}-photos`}>
       <PhotoGrid photos={photos.filter((p) => p.kind === kind)} />
       <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium hover:bg-slate-50">
@@ -52,7 +75,7 @@ function JobPhotos({ b, photos, reload }) {
         <input type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => { const fs = [...e.target.files]; e.target.value = ""; up(kind, fs); }} data-testid={`booking-upload-${kind}-input`} />
       </label>
     </Sec>
-  ));
+  ))}<SendResults b={b} photos={photos} /></>;
 }
 
 function TipRequest({ b }) {
