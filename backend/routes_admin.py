@@ -278,6 +278,8 @@ async def patch_booking(booking_id: str, body: BookingPatch, ctx=Depends(require
             return {"ok": True}
     if body.status not in ("completed", "cancelled", "confirmed"):
         raise HTTPException(400, "Invalid status")
+    if body.status == b.get("status"):
+        return {"ok": True}
     await tdb.bookings.update_one({"_id": b["_id"]}, {"$set": {"status": body.status, "updated_at": now_iso()}})
     await audit("booking.status", f"{b.get('reference') or b['_id']} -> {body.status}")
     c, s = b["customer"], await get_settings()

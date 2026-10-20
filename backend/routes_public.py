@@ -333,7 +333,7 @@ async def finalize_booking(booking_id: str, paid: bool = True):
     pay_text = (f"Deposit of £{b['deposit_amount']:.2f} received. The remaining balance of £{b['balance_due']:.2f} is due immediately after the clean." if deposit
                 else f"Payment of £{b['total'] + (b.get('tip') or 0):.2f} received" + (f" (including a £{b['tip']:.2f} tip - thank you!)." if b.get("tip") else ".") if paid else f"Amount due: £{b['total']:.2f}. {s['business'].get('payment_instructions', '')}")
     await tdb.leads.update_one({"_id": oid(b["lead_id"])}, {"$set": {"status": "booked"}})
-    await tdb.quotes.update_one({"_id": oid(b["quote_id"])}, {"$set": {"status": "accepted"}})
+    await tdb.quotes.update_one({"_id": oid(b["quote_id"])}, {"$set": {"status": "accepted"}}) if b.get("quote_id") else None
     await add_event(b["lead_id"], "booking", f"Booking confirmed ({'deposit paid' if deposit else 'paid'}): {b['service_name']} {when} (£{b['total']:.2f})")
     r = b.get("residential")
     res_text = (f" Services: {', '.join(r['services'])}." + (f" Other requests: {r['other_request']}." if r["other_request"] else "")) if r else ""
@@ -343,7 +343,8 @@ async def finalize_booking(booking_id: str, paid: bool = True):
                    "To reschedule, please give us at least 48 hours' notice. Our company policy applies to this booking.", lead_id=b["lead_id"])
     await log_comm(c["phone"], "sms", "booking_confirmation", "Booking confirmed",
                    f"{company_name()}: your clean is confirmed for {when}. Reply or call us to make changes.", lead_id=b["lead_id"])
-    await notify_owner(s, f"New booking - {when}", f"{c['name']} {c['phone']} - {b['service_name']} at {b.get('address') or ''} {b['postcode']}, total £{b['total']:.2f}. {pay_text}{res_text} Access: {b.get('access_notes') or '-'}", b["lead_id"])
+    owner_res = (f" {r['frequency']} · {r['people']} · pets: {r['pets']} · last cleaned: {r['last_cleaned']}." + (" REGULAR CLEAN - next visits auto-charged to the saved card." if b.get("recurring") else "")) if r else ""
+    await notify_owner(s, f"New booking - {when}", f"{c['name']} {c['phone']} - {b['service_name']} at {b.get('address') or ''} {b['postcode']}, total £{b['total']:.2f}. {pay_text}{owner_res}{res_text} Access: {b.get('access_notes') or '-'}", b["lead_id"])
     remind_at = (date.fromisoformat(b["date"]) - timedelta(days=1)).isoformat() + "T17:00:00+00:00"
     await log_comm(c["phone"], "sms", "appointment_reminder", "Reminder",
                    f"Reminder: {company_name()} is booked for {when}. Please ensure access as discussed.", lead_id=b["lead_id"], scheduled_for=remind_at)

@@ -76,7 +76,13 @@ async def _create_and_charge(plan: dict, s: dict):
     await tdb.payment_transactions.insert_one({"session_id": pi.id if pi else f"failed-{bid}", "booking_id": bid, "amount": float(plan["total"]), "kind": "recurring", "currency": "gbp",
                                               "status": "complete" if ok else "failed", "payment_status": "paid" if ok else "failed", "created_at": now_iso(), "updated_at": now_iso()})
     if ok:
-        await finalize_booking(bid)
+        try:
+            await finalize_booking(bid)
+        except Exception:
+            logger.exception("finalize failed for recurring visit %s", bid)
+            await tdb.bookings.update_one({"_id": oid(bid)}, {"$set": {"status": "confirmed", "payment_status": "paid", "paid_at": now_iso()}})
+            await notify_owner(s, f"Regular clean paid - please check booking ({c['name']})",
+                               f"£{plan['total']:.2f} was charged for {fmt_date(when)} {plan['slot']} and the visit is confirmed, but the confirmation emails could not be sent. Please contact the customer.", plan["lead_id"])
     else:
         await tdb.bookings.update_one({"_id": oid(bid)}, {"$set": {"status": "payment_failed", "payment_status": "failed"}})
         await log_comm(c["email"], "email", "recurring_payment_failed", "We couldn't take payment for your next clean",
