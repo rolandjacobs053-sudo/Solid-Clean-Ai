@@ -14,4 +14,4 @@ Disallow: /unsubscribe
 Disallow: /carpet-cleaning/quote/
 Disallow: /api/
 
-Sitemap: https://solidcleanltd.com/sitemap.xml
+Sitemap: https://solid-clean-ai.emergent.host/sitemap.xml

@@ -69,3 +69,9 @@ Earlier history: started as an integrated Solid Clean system, then a multi-tenan
 - Address intentionally not published (service-area business). Real hours not yet entered by owner.
 
 
+## 2026-10-20 - SEO production domain
+- User confirmed production domain: https://solid-clean-ai.emergent.host. Switched canonical, og:url, JSON-LD, sitemap.xml (19 URLs) and robots.txt Sitemap line to it (SeoManager SITE constant).
+- Verified on preview: all 19 sitemap pages 200, index/follow, unique titles, correct canonicals; robots.txt and sitemap.xml valid. Live production site had no X-Robots-Tag/noindex. Needs re-publish to push domain change live.
+- If a custom domain (solidcleanltd.com) is connected later, update SITE in SeoManager.jsx, index.html, sitemap.xml and robots.txt.
+
+

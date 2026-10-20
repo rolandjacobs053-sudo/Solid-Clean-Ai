@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
-const SITE = "https://solidcleanltd.com";
+const SITE = "https://solid-clean-ai.emergent.host";
 const BRAND = "Solid Clean Ltd";
 const DEFAULT = ["Professional Cleaning in London & Surrey", "Solid Clean Ltd - professional residential, end of tenancy, carpet and commercial cleaning across London and Surrey. Book online or call 020 3728 4419."];
 const PAGES = {
