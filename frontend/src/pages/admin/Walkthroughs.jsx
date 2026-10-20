@@ -7,16 +7,19 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Textarea } from "@/components/ui/textarea";
 import { Empty, PageHeader, StatusBadge, useLoad } from "@/components/admin/ui";
 import { PhotoGrid } from "@/components/admin/BookingDetail";
+import { FIELD_LABELS } from "@/components/site/WalkthroughForm";
+
+const ENUM_KEYS = ["condition"];
 import { api, errMsg, fmtDate, fmtDateTime } from "@/lib/api";
 
 const nice = (v) => (Array.isArray(v) ? v.join(", ") : v === true ? "Yes" : String(v ?? "").replace(/_/g, " "));
-const R = ({ k, v }) => (v ? <div className="flex justify-between gap-4 py-0.5 text-sm"><span className="text-slate-500">{k}</span><span className="text-right font-medium">{nice(v)}</span></div> : null);
+const R = ({ k, v, raw }) => ((Array.isArray(v) ? v.length : v) ? <div className="flex justify-between gap-4 py-0.5 text-sm"><span className="text-slate-500">{k}</span><span className="text-right font-medium">{raw ? v : nice(v)}</span></div> : null);
 const Sec = ({ title, children, testid }) => <section className="border-t border-slate-100 pt-4" data-testid={testid}><h3 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-slate-500">{title}</h3>{children}</section>;
 
 function Actions({ w, reload }) {
   const [f, setF] = useState({ confirmed_date: w.visit.preferred_date, confirmed_time: w.visit.preferred_time, message: "" });
   const send = async (status) => {
-    try { await api.patch(`/admin/walkthroughs/${w.id}`, { status, ...f }); toast.success(status === "confirmed" ? "Visit confirmed - customer emailed" : status === "alternative_proposed" ? "Alternative sent to customer" : "Status updated"); reload(); } catch (e) { toast.error(errMsg(e)); }
+    try { await api.patch(`/admin/walkthroughs/${w.id}`, { status, ...f }); toast.success(status === "confirmed" ? "Visit confirmed - customer emailed" : status === "alternative_proposed" ? "Alternative sent to customer" : "Status updated"); setF((x) => ({ ...x, message: "" })); reload(); } catch (e) { toast.error(errMsg(e)); }
   };
   return (
     <Sec title="Review & respond" testid="walkthrough-actions">
@@ -45,12 +48,12 @@ function Detail({ id, reload }) {
   return (
     <div className="mt-4 space-y-4" data-testid="walkthrough-detail">
       <div className="flex flex-wrap items-center gap-2"><StatusBadge status={w.status} /><span className="text-xs text-slate-500">{w.availability_note}</span></div>
-      <Sec title="Requested visit"><R k="Preferred" v={`${fmtDate(v.preferred_date)} ${v.preferred_time}`} /><R k="Alternative" v={v.alt_date && `${fmtDate(v.alt_date)} ${v.alt_time}`} /><R k="Access for visit" v={v.access_info} />{w.confirmed_date && <R k="Confirmed" v={`${fmtDate(w.confirmed_date)} ${w.confirmed_time}`} />}</Sec>
-      <Sec title="Business & contact"><R k="Business" v={w.business_name} /><R k="Premises type" v={w.establishment_name} /><R k="Contact" v={w.contact.name} />
-        <R k="Phone" v={w.contact.phone} /><R k="Email" v={w.contact.email} /><R k="Address" v={`${w.address}, ${w.postcode}`} />
+      <Sec title="Requested visit"><R k="Preferred" v={`${fmtDate(v.preferred_date)} ${v.preferred_time}`} raw /><R k="Alternative" v={v.alt_date && `${fmtDate(v.alt_date)} ${v.alt_time}`} raw /><R k="Access for visit" v={v.access_info} raw />{w.confirmed_date && <R k="Confirmed" v={`${fmtDate(w.confirmed_date)} ${w.confirmed_time}`} raw />}</Sec>
+      <Sec title="Business & contact"><R k="Business" v={w.business_name} raw /><R k="Premises type" v={w.establishment_name} raw /><R k="Contact" v={w.contact.name} raw />
+        <R k="Phone" v={w.contact.phone} raw /><R k="Email" v={w.contact.email} raw /><R k="Address" v={`${w.address}, ${w.postcode}`} raw />
         <div className="mt-2 flex gap-2"><a className="text-xs underline" href={`tel:${w.contact.phone}`}>Call</a><a className="text-xs underline" href={`mailto:${w.contact.email}`}>Email</a></div></Sec>
-      <Sec title="Premises answers" testid="walkthrough-answers">{Object.entries(w.details || {}).map(([k, x]) => <R key={k} k={nice(k)} v={x} />)}</Sec>
-      <Sec title="Cleaning requirements"><R k="Type" v={s.kind} /><R k="Frequency" v={s.frequency} /><R k="Days" v={s.days} /><R k="Time" v={s.time} /><R k="Preferred start" v={s.start_date && fmtDate(s.start_date)} /><R k="Notes" v={s.notes} /></Sec>
+      <Sec title="Premises answers" testid="walkthrough-answers">{Object.entries(w.details || {}).map(([k, x]) => <R key={k} k={FIELD_LABELS[k] || nice(k)} v={x} raw={!ENUM_KEYS.includes(k)} />)}</Sec>
+      <Sec title="Cleaning requirements"><R k="Type" v={s.kind} /><R k="Frequency" v={s.frequency} /><R k="Days" v={s.days} /><R k="Time" v={s.time} /><R k="Preferred start" v={s.start_date && fmtDate(s.start_date)} raw /><R k="Notes" v={s.notes} raw /></Sec>
       <Sec title={`Photos (${d.photos.length})`} testid="walkthrough-photos"><PhotoGrid photos={d.photos} /></Sec>
       <Actions w={w} reload={() => { load(); reload(); }} />
       <Sec title="History">{(w.history || []).map((h, i) => <p key={i} className="text-xs text-slate-600">{fmtDateTime(h.at)} · {h.text}</p>)}</Sec>

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from typing import Dict, List, Literal, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -53,13 +53,14 @@ class WalkthroughIn(BaseModel):
     marketing_consent: bool = False
 
 
-def _availability_note(av: dict, day: str) -> str:
+def _availability_note(av: dict, day: str, alt: str = "") -> str:
     try:
         d = date.fromisoformat(day)
+        a = date.fromisoformat(alt) if alt else None
     except ValueError:
         raise HTTPException(422, "Please choose a valid preferred date.")
-    if d <= now().date():
-        raise HTTPException(422, "Please choose a preferred date in the future.")
+    if d <= now().date() or (a and a <= now().date()):
+        raise HTTPException(422, "Please choose dates in the future.")
     if d.weekday() not in av["working_days"] or day in av["blocked_dates"]:
         return "Outside normal working days - check before confirming"
     return "Within normal working days - not yet confirmed"
@@ -73,7 +74,10 @@ async def request_walkthrough(body: WalkthroughIn):
         if len(k) > 60 or len(str(v)) > 1000:
             raise HTTPException(422, "One of the answers is too long.")
     s = await get_settings()
-    note = _availability_note(s["availability"], body.visit.preferred_date)
+    note = _availability_note(s["availability"], body.visit.preferred_date, body.visit.alt_date)
+    since = (now() - timedelta(hours=24)).isoformat()
+    if await tdb.walkthroughs.count_documents({"contact.email": body.contact.email, "created_at": {"$gte": since}}) >= 3:
+        raise HTTPException(429, "We've already received your requests today - our team will be in touch. You can also call us.")
     lead_id = await upsert_lead({**body.contact.model_dump(), "postcode": body.postcode}, "website",
                                 f"Free site walkthrough requested: {TYPES[body.establishment]} - {body.business_name}",
                                 {"type": "commercial", "marketing_consent": body.marketing_consent})
@@ -127,10 +131,17 @@ async def update_walkthrough(wid: str, body: WalkPatch):
         if body.status not in STATUSES:
             raise HTTPException(400, "Invalid status")
         upd["status"] = body.status
+        if w["status"] in ("completed", "declined"):
+            raise HTTPException(400, f"This request is already {w['status']}")
         c = w["contact"]
         if body.status == "confirmed":
             if not (body.confirmed_date and body.confirmed_time):
                 raise HTTPException(422, "Choose the confirmed date and time")
+            try:
+                if date.fromisoformat(body.confirmed_date) < now().date():
+                    raise HTTPException(422, "The confirmed date is in the past")
+            except ValueError:
+                raise HTTPException(422, "Choose a valid confirmed date")
             upd.update(confirmed_date=body.confirmed_date, confirmed_time=body.confirmed_time)
             text = f"Visit confirmed for {fmt_date(body.confirmed_date)} {body.confirmed_time}"
             await log_comm(c["email"], "email", "walkthrough_confirmed", f"Your free site walkthrough is confirmed - {fmt_date(body.confirmed_date)} {body.confirmed_time}",

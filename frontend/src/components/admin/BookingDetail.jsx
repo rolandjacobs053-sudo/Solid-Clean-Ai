@@ -48,7 +48,7 @@ function JobPhotos({ b, photos, reload }) {
       <PhotoGrid photos={photos.filter((p) => p.kind === kind)} />
       <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium hover:bg-slate-50">
         {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : "+"} Add {kind} photos
-        <input type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => up(kind, [...e.target.files])} data-testid={`booking-upload-${kind}-input`} />
+        <input type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => { const fs = [...e.target.files]; e.target.value = ""; up(kind, fs); }} data-testid={`booking-upload-${kind}-input`} />
       </label>
     </Sec>
   ));

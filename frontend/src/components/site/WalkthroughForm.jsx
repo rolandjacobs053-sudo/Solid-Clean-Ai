@@ -25,6 +25,7 @@ const EXTRA = {
 const COMMON = [["floor_area", "Approximate floor area (if known)"], ["floors", "Number of floors"], ["rooms", "Number of rooms / main areas"], ["toilets", "Toilets and washrooms"],
   ["kitchens", "Kitchens or staff rooms"], ["flooring", "Flooring types (e.g. carpet, vinyl, tiles)"]];
 const CONDITION = [["good", "Well maintained"], ["average", "Average"], ["needs_attention", "Needs extra attention"]];
+export const FIELD_LABELS = Object.fromEntries([...COMMON, ...Object.values(EXTRA).flat(), ["attention", "Areas requiring particular attention"], ["special", "Special cleaning requirements"], ["condition", "Current condition"]]);
 const FREQ = [["daily", "Daily"], ["several_weekly", "Several times a week"], ["weekly", "Weekly"], ["fortnightly", "Fortnightly"], ["monthly", "Monthly"]];
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const TIMES = [["early_morning", "Early morning"], ["daytime", "Daytime"], ["evening", "Evening"], ["overnight", "Overnight"]];

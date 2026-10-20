@@ -47,7 +47,7 @@ export default function CommercialPage() {
         <p className="mt-2 text-slate-600">Select your premises to open a short form tailored to your business.</p>
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
           {TYPES.map(([k, name, desc]) => (
-            <button key={k} onClick={() => pick(k)} className={`group overflow-hidden rounded-3xl border bg-white text-left transition-transform hover:-translate-y-1 ${type === k ? "border-[#023F00] ring-2 ring-[#023F00]" : "border-slate-200"}`} data-testid={`commercial-type-${k}`}>
+            <button key={k} onClick={() => pick(k)} className={`group flex flex-col justify-start overflow-hidden rounded-3xl border bg-white text-left transition-transform hover:-translate-y-1 ${type === k ? "border-[#023F00] ring-2 ring-[#023F00]" : "border-slate-200"}`} data-testid={`commercial-type-${k}`}>
               <div className="overflow-hidden"><img src={`/commercial/${k}.jpg`} alt={name} className="h-40 w-full object-cover transition-transform duration-500 group-hover:scale-105" /></div>
               <div className="p-5"><h3 className="font-display font-semibold" style={{ color: G }}>{name}</h3><p className="mt-2 text-sm text-slate-600">{desc}</p>
                 <span className="mt-3 inline-block font-mono text-[11px] font-semibold uppercase tracking-wider" style={{ color: GOLD }}>Request a free walkthrough →</span></div>
