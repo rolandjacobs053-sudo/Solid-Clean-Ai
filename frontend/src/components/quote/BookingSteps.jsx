@@ -29,7 +29,7 @@ export function StepService({ services, form, set }) {
     {form.service === "carpet" && <Link to="/carpet-cleaning/request" className="block rounded-2xl border-2 border-[#8F7E22] bg-[#fbf9f1] p-4 text-sm font-semibold text-[#023F00]" data-testid="quote-carpet-request-link">Carpet cleaning starts from £100 and is quoted after we review your request and photos. Request a carpet cleaning quote →</Link>}
     <div className="grid gap-3 sm:grid-cols-2" data-testid="quote-service-options">
       {services.map((s) => <ChoiceCard key={s.key} active={form.service === s.key} onClick={() => set("service", s.key)} title={s.name}
-        sub={s.requires_survey ? "Priced after a short survey" : `From ${gbp(s.min_price)}${isEot(s.key) ? " · move-out clean" : s.key === "regular" ? " · routine home clean" : ""}`} testid={`quote-service-${s.key}`} />)}
+        sub={s.from_price ? `From ${gbp(s.from_price)} · quoted after review` : s.requires_survey ? "Priced after a short survey" : `From ${gbp(s.min_price)}${isEot(s.key) ? " · move-out clean" : s.key === "regular" ? " · routine home clean" : ""}`} testid={`quote-service-${s.key}`} />)}
     </div>
     </>
   );

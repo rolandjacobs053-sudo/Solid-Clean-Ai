@@ -103,7 +103,7 @@ function Footer({ b }) {
         <div className="md:col-span-2">
           <p className="font-display text-xl font-bold text-white">{b.name}</p>
           <p className="mt-3 max-w-sm text-sm">Residential, End of Tenancy, carpet and commercial cleaning{b.service_areas_text ? ` across ${b.service_areas_text}` : ""}.</p>
-          {b.phone && <a href={`tel:${b.phone.replace(/\s/g, "")}`} className="mt-4 block font-mono text-lg font-semibold" style={{ color: "#d9c56a" }}>{b.phone}</a>}
+          {b.phone && <a href={tel(b.phone)} className="mt-4 block font-mono text-lg font-semibold" style={{ color: "#d9c56a" }}>{b.phone}</a>}
         </div>
         <div className="space-y-2 text-sm">{NAV.map(([to, t]) => <Link key={to} to={to} className="block hover:text-white">{t}</Link>)}</div>
         <div className="space-y-2 text-sm">{LEGAL.map(([to, t]) => <Link key={to} to={to} className="block hover:text-white" data-testid={`footer-${to.slice(1)}`}>{t}</Link>)}<Link to="/unsubscribe" className="block hover:text-white">Marketing preferences</Link></div>

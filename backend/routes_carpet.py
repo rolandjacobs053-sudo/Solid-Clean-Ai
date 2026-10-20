@@ -108,6 +108,15 @@ class AcceptIn(BaseModel):
     origin_url: str
 
 
+async def _expire_pending(qid: str):
+    async for pb in tdb.bookings.find({"carpet_quote_id": qid, "status": "pending_payment"}):
+        try:
+            stripe.checkout.Session.expire(pb["session_id"])
+        except Exception:
+            pass
+        await tdb.bookings.update_one({"_id": pb["_id"]}, {"$set": {"status": "abandoned"}})
+
+
 @public.post("/{qid}/accept")
 async def accept_quote(qid: str, body: AcceptIn):
     q = await tdb.carpet_quotes.find_one({"_id": oid(qid)})
@@ -118,7 +127,7 @@ async def accept_quote(qid: str, body: AcceptIn):
         raise HTTPException(409, "Please confirm you accept the Terms and Conditions before paying.")
     terms = {p["key"]: p["published_version"] async for p in tdb.policies.find({"require_acceptance": True, "published_version": {"$gt": 0}, "unpublished": {"$ne": True}})}
     qt, c = q["quote"], q["contact"]
-    await tdb.bookings.update_many({"carpet_quote_id": qid, "status": "pending_payment"}, {"$set": {"status": "abandoned"}})
+    await _expire_pending(qid)
     lead = await tdb.leads.find_one({"_id": oid(q["lead_id"])})
     booking = {"lead_id": q["lead_id"], "quote_id": None, "carpet_quote_id": qid, "customer": c, "postcode": q["postcode"], "address": q["address"],
                "service": "carpet", "service_name": "Carpet Cleaning", "input": {"address": q["address"], "postcode": q["postcode"], "property_notes": summary(q)},
@@ -137,17 +146,32 @@ async def accept_quote(qid: str, body: AcceptIn):
     await tdb.payment_transactions.insert_one({"session_id": session.id, "booking_id": bid, "amount": float(qt["price"]), "kind": "carpet", "currency": "gbp",
                                               "status": "initiated", "payment_status": "pending", "created_at": now_iso(), "updated_at": now_iso()})
     await tdb.bookings.update_one({"_id": oid(bid)}, {"$set": {"session_id": session.id}})
+    await tdb.carpet_quotes.update_one({"_id": q["_id"]}, {"$set": {"pending_booking_id": bid}})
     return {"checkout_url": session.url}
 
 
+async def _stale_payment(b: dict):
+    refund = {"amount": b["total"], "rule_percent": 100, "suggested": b["total"], "notice_hours": None, "note": "Paid for an out-of-date or declined quote",
+              "status": "to_issue_in_stripe", "recorded_at": now_iso(), "recorded_by": "system"}
+    res = await tdb.bookings.update_one({"_id": b["_id"], "status": {"$in": ["pending_payment", "abandoned"]}},
+                                       {"$set": {"status": "cancelled", "payment_status": "refund_due", "paid_at": now_iso(), "refund": refund}})
+    if res.modified_count:
+        await add_event(b["lead_id"], "payment", f"Payment of £{b['total']:.2f} received for an out-of-date carpet quote - full refund recorded")
+        await notify_owner(await get_settings(), f"Refund needed - out-of-date carpet quote paid ({b['customer']['name']})",
+                           f"{b['customer']['name']} paid £{b['total']:.2f} using an out-of-date or declined carpet quote (ref {b['reference']}). Please refund it in Stripe.", b["lead_id"])
+
+
 async def settle_carpet(tx: dict):
-    res = await tdb.bookings.update_one({"_id": oid(tx["booking_id"]), "status": {"$in": ["pending_payment", "abandoned"]}},
+    b = await tdb.bookings.find_one({"_id": oid(tx["booking_id"])})
+    q = await tdb.carpet_quotes.find_one({"_id": oid(b["carpet_quote_id"])})
+    if not (q and q["status"] == "quoted" and q.get("pending_booking_id") == str(b["_id"])):
+        return await _stale_payment(b)
+    res = await tdb.bookings.update_one({"_id": b["_id"], "status": {"$in": ["pending_payment", "abandoned"]}},
                                        {"$set": {"status": "awaiting_approval", "payment_status": "paid", "paid_at": now_iso()}})
     if not res.modified_count:
         return
-    b = await tdb.bookings.find_one({"_id": oid(tx["booking_id"])})
     when = f"{fmt_date(b['date'])} {b['slot']}"
-    await tdb.carpet_quotes.update_one({"_id": oid(b["carpet_quote_id"])}, {"$set": {"status": "accepted", "booking_id": str(b["_id"])},
+    await tdb.carpet_quotes.update_one({"_id": q["_id"], "status": "quoted"}, {"$set": {"status": "accepted", "booking_id": str(b["_id"])},
                                                                          "$push": {"history": {"at": now_iso(), "text": f"Quote accepted and £{b['total']:.2f} paid - awaiting your approval"}}})
     await add_event(b["lead_id"], "payment", f"Carpet quote accepted and paid (£{b['total']:.2f}) - awaiting approval")
     await log_comm(b["customer"]["email"], "email", "carpet_payment_received", "Payment received - awaiting approval",
@@ -190,6 +214,7 @@ async def send_quote(qid: str, body: QuoteOut, request: Request):
     except ValueError:
         raise HTTPException(422, "Choose a valid appointment date")
     token = q.get("token") or secrets.token_urlsafe(16)
+    await _expire_pending(qid)
     host = request.headers.get("x-forwarded-host") or request.headers.get("host")
     url = f"https://{host}/carpet-cleaning/quote/{qid}?t={token}"
     c = q["contact"]
@@ -239,6 +264,7 @@ async def decline(qid: str, body: DeclineIn):
     if q["status"] in ("confirmed", "declined"):
         raise HTTPException(400, f"This request is already {q['status']}")
     paid = await tdb.bookings.find_one({"_id": oid(q["booking_id"]), "status": "awaiting_approval"}) if q.get("booking_id") else None
+    await _expire_pending(qid)
     note = "Request declined"
     if paid:
         refund = {"amount": paid["total"], "rule_percent": 100, "suggested": paid["total"], "notice_hours": None, "note": "Declined before approval",
