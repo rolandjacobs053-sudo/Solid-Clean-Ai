@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /login
+Disallow: /app
+Disallow: /signup
+Disallow: /platform
+Disallow: /c/
+Disallow: /tip/
+Disallow: /results/
+Disallow: /feedback/
+Disallow: /payment/
+Disallow: /unsubscribe
+Disallow: /carpet-cleaning/quote/
+Disallow: /api/
+
+Sitemap: https://solidcleanltd.com/sitemap.xml

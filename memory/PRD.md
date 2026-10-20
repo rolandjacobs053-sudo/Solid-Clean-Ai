@@ -56,3 +56,10 @@ Earlier history: started as an integrated Solid Clean system, then a multi-tenan
 - P1 Phase 5: owner-only Road Charge & Travel Cost Checker + job profitability + expenses
 - P1 Phase 6: commercial pipeline (13 stages), commercial quotes & agreements
 - P2 Phase 7: Twilio voice connect, SMS, daily AI report, Google integrations
+
+## 2026-10-20 - Google visibility (SEO)
+- User: "I can't see website on Google". Live domain: solidcleanltd.com.
+- Added public/robots.txt (blocks admin/login/private links), public/sitemap.xml (19 public pages), LocalBusiness JSON-LD, OG/Twitter tags, canonical, crawler-readable noscript text in index.html.
+- SeoManager (components/site/SeoManager.jsx) sets per-page title/description/canonical; non-public routes get noindex.
+- Pending on user: verify domain in Google Search Console, submit sitemap, create Google Business Profile; opening hours/address not provided (left out of structured data).
+

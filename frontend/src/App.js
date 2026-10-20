@@ -7,6 +7,7 @@ import { api, getSource } from "@/lib/api";
 import { useTenant } from "@/lib/tenant";
 import { BookingHeader } from "@/components/site/SiteHeader";
 import { ChatWidget } from "@/components/site/ChatWidget";
+import { SeoManager } from "@/components/site/SeoManager";
 import QuotePage from "@/pages/QuotePage";
 import PaymentResult from "@/pages/PaymentResult";
 import TipPage from "@/pages/site/TipPage";
@@ -96,6 +97,7 @@ function App() {
     <div className="App">
       <AuthProvider>
         <BrowserRouter>
+          <SeoManager />
           <Routes>
             <Route element={<SiteLayout />}>
               <Route path="/" element={<HomePage />} />
