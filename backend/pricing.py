@@ -84,6 +84,34 @@ def _find(items, key):
     return next((i for i in items if i["key"] == key), None)
 
 
+RESIDENTIAL = {
+    "frequencies": [{"key": "one_off", "name": "One-off cleaning", "discount": 0}, {"key": "weekly", "name": "Weekly cleaning", "discount": 15},
+                    {"key": "fortnightly", "name": "Fortnightly cleaning", "discount": 10}, {"key": "monthly", "name": "Monthly cleaning", "discount": 5}],
+    "last_cleaned": [{"key": "under_2_weeks", "name": "Within the last 2 weeks", "multiplier": 1.0}, {"key": "under_month", "name": "2-4 weeks ago", "multiplier": 1.1},
+                     {"key": "1_3_months", "name": "1-3 months ago", "multiplier": 1.2}, {"key": "over_3_months", "name": "Over 3 months ago / not sure", "multiplier": 1.35}],
+    "people": [{"key": "1_2", "name": "1-2 people", "multiplier": 1.0}, {"key": "3_4", "name": "3-4 people", "multiplier": 1.05}, {"key": "5_plus", "name": "5 or more people", "multiplier": 1.1}],
+    "pets_multiplier": 1.05,
+    "tasks": [{"key": "general", "name": "General house cleaning", "price": 0, "per_item": False}, {"key": "kitchen", "name": "Kitchen cleaning", "price": 0, "per_item": False},
+              {"key": "bathroom", "name": "Bathroom cleaning", "price": 0, "per_item": False}, {"key": "dusting", "name": "Dusting and vacuuming", "price": 0, "per_item": False},
+              {"key": "mopping", "name": "Mopping floors", "price": 0, "per_item": False},
+              {"key": "beds", "name": "Making beds and changing bed linen", "price": 5, "per_item": True, "unit": "bed", "max_qty": 8},
+              {"key": "dishes", "name": "Washing dishes", "price": 10, "per_item": False},
+              {"key": "laundry", "name": "Washing and folding clothes", "price": 12, "per_item": True, "unit": "load", "max_qty": 6},
+              {"key": "ironing", "name": "Ironing clothes", "price": 20, "per_item": True, "unit": "hour", "max_qty": 6},
+              {"key": "other", "name": "Other cleaning requests", "price": 0, "per_item": False}],
+}
+
+
+def _item_line(item: dict, qtys: dict) -> dict:
+    price = max(float(item.get("price") or 0), 0)
+    try:
+        cap = max(int(item.get("max_qty") or 20), 1)
+    except (TypeError, ValueError):
+        cap = 20
+    n = max(1, min(int(qtys.get(item["key"]) or 1), cap)) if item.get("per_item") else 1
+    return {"label": item["name"] + (f" × {n}" if item.get("per_item") else ""), "amount": round(price * n, 2)}
+
+
 def postcode_prefix(postcode: str) -> str:
     m = re.match(r"^\s*([A-Za-z]{1,2})", postcode or "")
     return m.group(1).upper() if m else ""
@@ -101,6 +129,12 @@ def compute_quote(pricing: dict, q: dict, public: bool = True) -> dict:
         return result
     ptype = _find(pricing["property_types"], q.get("property_type")) or pricing["property_types"][1]
     cond = _find(pricing["conditions"], q.get("condition")) or pricing["conditions"][0]
+    res = (pricing.get("residential") or RESIDENTIAL) if q.get("frequency") and svc["key"] == "regular" else None
+    if res:
+        lc = _find(res["last_cleaned"], q.get("last_cleaned")) or res["last_cleaned"][0]
+        pp = _find(res["people"], q.get("people")) or res["people"][0]
+        pets_m = float(res.get("pets_multiplier") or 1) if q.get("pets") not in ("", "no", None) else 1.0
+        cond = {"name": "home & condition", "multiplier": lc["multiplier"] * pp["multiplier"] * pets_m}
     beds, baths, livs = int(q.get("bedrooms", 0)), int(q.get("bathrooms", 1)), int(q.get("living_rooms", 1))
     if svc["pricing_mode"] == "per_room":
         lines = [
@@ -121,18 +155,22 @@ def compute_quote(pricing: dict, q: dict, public: bool = True) -> dict:
     qtys = q.get("extra_qty") or {}
     for key in chosen:
         if key not in excluded:
-            extra = _find(pricing["extras"], key)
-            price = max(float(extra.get("price") or 0), 0)
-            try:
-                cap = max(int(extra.get("max_qty") or 20), 1)
-            except (TypeError, ValueError):
-                cap = 20
-            n = max(1, min(int(qtys.get(key) or 1), cap)) if extra.get("per_item") else 1
-            lines.append({"label": extra["name"] + (f" × {n}" if extra.get("per_item") else ""), "amount": round(price * n, 2)})
+            lines.append(_item_line(_find(pricing["extras"], key), qtys))
+    if res:
+        for t in res["tasks"]:
+            if t["key"] in (q.get("tasks") or []):
+                lines.append(_item_line(t, q.get("task_qty") or {}))
     total = round(sum(line["amount"] for line in lines), 2)
     if total < svc["min_price"]:
         lines.append({"label": "Minimum booking value top-up", "amount": round(svc["min_price"] - total, 2)})
         total = float(svc["min_price"])
+    if res:
+        fq = _find(res["frequencies"], q["frequency"]) or res["frequencies"][0]
+        result["frequency"] = fq["name"]
+        if fq.get("discount"):
+            off = round(total * float(fq["discount"]) / 100, 2)
+            lines.append({"label": f"{fq['name']} discount ({fq['discount']}%)", "amount": -off})
+            total = round(total - off, 2)
     sn = pricing.get("short_notice") or {}
     if q.get("date") and sn.get("value"):
         try:

@@ -65,6 +65,7 @@ export default function QuotePage() {
   const hints = ["", "", "Please wait for photos to finish uploading", "", "Please complete the access details", "Choose a date & time, add your name, email, phone and the property address and postcode", "Please read and accept the booking terms", ""];
   const commercial = form.service === "commercial";
   const carpet = form.service === "carpet";
+  const residential = form.service === "regular";
   const deposit = preview?.deposit ?? preview?.total;
   const photoRefs = photos.filter((x) => x.status === "done").map(({ id, token }) => ({ id, token }));
 
@@ -96,7 +97,7 @@ export default function QuotePage() {
           {step === 6 && <StepTerms policies={policies} base={base} accepted={accepted} setAccepted={setAccepted} needsReview={needsReview} />}
           {step === 7 && <StepReview p={p} svc={svc} form={form} access={access} photos={photos} date={date} slot={slot} contact={contact} preview={preview} policies={policies} needsReview={needsReview} deposit={deposit} tip={tip} setTip={setTip} payOk={payOk} setPayOk={setPayOk} base={base} />}
           <StepNav prefix="quote" step={step} last={7} setStep={setStep} canNext={canNext} hint={hints[step]} nextLabel={step === 0 && commercial ? "Continue to free site walkthrough" : step === 0 && carpet ? "Continue to carpet quote request" : step === 2 && !photos.length ? "Skip photos" : "Continue"}
-            onNext={step === 0 && (commercial || carpet) ? () => navigate(commercial ? "/commercial-cleaning/request" : "/carpet-cleaning/request") : undefined}>
+            onNext={step === 0 && (commercial || carpet || residential) ? () => navigate(commercial ? "/commercial-cleaning/request" : carpet ? "/carpet-cleaning/request" : "/residential-cleaning/book") : undefined}>
             {step === 7 && !needsReview && (
               <Button disabled={busy || !termsOk || !payOk} onClick={() => submit("book")} className="rounded-full bg-[#023F00] px-7 text-white hover:bg-[#8F7E22]" data-testid="quote-book-now-btn">
                 {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{deposit < preview?.total ? `Pay ${gbp(deposit + tip)} deposit & confirm` : `Pay ${gbp((preview?.total || 0) + tip)} & confirm`}

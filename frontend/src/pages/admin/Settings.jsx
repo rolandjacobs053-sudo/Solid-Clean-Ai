@@ -91,6 +91,15 @@ export default function Settings() {
             </Panel>
           </div>
           <ExtrasEditor pricing={p} setP={setP} />
+          {p.residential && <Panel title="Residential cleaning - frequency discounts, condition & services (placeholders)">
+            <div className="grid gap-6 lg:grid-cols-2" data-testid="settings-residential">
+              <div><Label>Frequency discount (%)</Label><NumTable rows={p.residential.frequencies} fields={["discount"]} onChange={(i, f, v) => setP("residential", { ...p.residential, frequencies: p.residential.frequencies.map((r, j) => (j === i ? { ...r, [f]: v } : r)) })} testid="settings-res-freq" /></div>
+              <div><Label>Last cleaned (multiplier)</Label><NumTable rows={p.residential.last_cleaned} fields={["multiplier"]} onChange={(i, f, v) => setP("residential", { ...p.residential, last_cleaned: p.residential.last_cleaned.map((r, j) => (j === i ? { ...r, [f]: v } : r)) })} testid="settings-res-last" /></div>
+              <div><Label>People in the property (multiplier)</Label><NumTable rows={p.residential.people} fields={["multiplier"]} onChange={(i, f, v) => setP("residential", { ...p.residential, people: p.residential.people.map((r, j) => (j === i ? { ...r, [f]: v } : r)) })} testid="settings-res-people" />
+                <Label className="mt-4 block">Pets multiplier</Label><Input type="number" step="0.01" className="mt-1 w-24 font-mono" value={p.residential.pets_multiplier} onChange={(e) => setP("residential", { ...p.residential, pets_multiplier: num(e.target.value) })} data-testid="settings-res-pets" /></div>
+              <div><Label>Services (£, 0 = included)</Label><NumTable rows={p.residential.tasks} fields={["price", "per_item"]} onChange={(i, f, v) => setP("residential", { ...p.residential, tasks: p.residential.tasks.map((r, j) => (j === i ? { ...r, [f]: v } : r)) })} testid="settings-res-tasks" /></div>
+            </div>
+          </Panel>}
         </TabsContent>
         <TabsContent value="rules"><RulesEditor pricing={p} setP={setP} /></TabsContent>
         <TabsContent value="history"><History /></TabsContent>

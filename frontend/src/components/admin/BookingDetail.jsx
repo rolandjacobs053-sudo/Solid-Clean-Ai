@@ -99,6 +99,26 @@ function TipRequest({ b }) {
   );
 }
 
+function RecurringPlan({ b }) {
+  const { user } = useAuth();
+  const [plan, setPlan] = useState(null);
+  const load = () => api.get(`/admin/recurring/${b.recurring_plan_id}`).then((r) => setPlan(r.data)).catch(() => setPlan(false));
+  useEffect(() => { if (user.role === "owner") load(); }, [b.recurring_plan_id]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!plan) return null;
+  const setStatus = async (status) => { try { await api.post(`/admin/recurring/${plan.id}/status`, { status }); toast.success(`Regular clean ${status}`); load(); } catch (e) { toast.error(errMsg(e)); } };
+  return (
+    <Sec title="Regular clean" testid="booking-recurring">
+      <R k="Frequency" v={plan.frequency} /><R k="Status" v={<StatusBadge status={plan.status} />} /><R k="Next visit" v={fmtDate(plan.next_date)} /><R k="Price per visit" v={gbp(plan.total)} />
+      <p className="text-xs text-slate-500">The saved card is charged automatically 2 days before each visit.</p>
+      <div className="mt-2 flex gap-2">
+        {plan.status === "active" && <Button size="sm" variant="outline" onClick={() => setStatus("paused")} data-testid="recurring-pause-btn">Pause</Button>}
+        {plan.status === "paused" && <Button size="sm" variant="outline" onClick={() => setStatus("active")} data-testid="recurring-resume-btn">Resume</Button>}
+        {plan.status !== "cancelled" && <Button size="sm" variant="ghost" className="text-red-700" onClick={() => window.confirm("Cancel this regular clean? No more visits will be charged.") && setStatus("cancelled")} data-testid="recurring-cancel-btn">Cancel regular clean</Button>}
+      </div>
+    </Sec>
+  );
+}
+
 function Detail({ b, reload }) {
   const { user } = useAuth();
   const [photos, setPhotos] = useState(null);
@@ -134,6 +154,7 @@ function Detail({ b, reload }) {
         {user.role === "owner" && b.payment_status === "deposit_paid" && b.balance_due > 0 && <Button size="sm" className="mt-2 bg-[#023F00] text-white hover:bg-[#8F7E22]" disabled={busy} onClick={sendBalance} data-testid="booking-send-balance-btn">Email balance payment link</Button>}
         <div className="mt-2"><RefundButton b={b} onDone={reload} /></div>
       </Sec>
+      {b.recurring_plan_id && <RecurringPlan b={b} />}
       {user.role === "owner" && b.status === "completed" && <TipRequest b={b} />}
       {b.refund && (
         <Sec title="Cancellation & refund" testid="booking-detail-refund">

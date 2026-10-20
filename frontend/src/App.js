@@ -11,6 +11,7 @@ import QuotePage from "@/pages/QuotePage";
 import PaymentResult from "@/pages/PaymentResult";
 import TipPage from "@/pages/site/TipPage";
 import ResultsPage from "@/pages/site/ResultsPage";
+import ResidentialBooking from "@/pages/site/ResidentialBooking";
 import Unsubscribe from "@/pages/Unsubscribe";
 import AdminLogin from "@/pages/AdminLogin";
 import Signup from "@/pages/Signup";
@@ -102,6 +103,7 @@ function App() {
               <Route path="/commercial-cleaning/request" element={<CommercialRequest />} />
               <Route path="/services/carpet" element={<Navigate to="/carpet-cleaning" replace />} />
               <Route path="/carpet-cleaning" element={<CarpetPage />} />
+              <Route path="/residential-cleaning/book" element={<ResidentialBooking />} />
               <Route path="/carpet-cleaning/request" element={<CarpetRequest />} />
               <Route path="/carpet-cleaning/quote/:id" element={<CarpetQuoteView />} />
               <Route path="/services/:key" element={<ServiceDetail />} />

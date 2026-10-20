@@ -53,6 +53,12 @@ class QuoteIn(BaseModel):
     additional_areas: List[str] = Field([], max_length=10)
     flooring: str = Field("", max_length=30)
     property_notes: str = Field("", max_length=1000)
+    frequency: str = Field("", max_length=20)
+    people: str = Field("", max_length=20)
+    last_cleaned: str = Field("", max_length=30)
+    tasks: List[str] = Field([], max_length=15)
+    task_qty: Dict[str, int] = Field({}, max_length=15)
+    other_request: str = Field("", max_length=1000)
 
 
 class PhotoRef(BaseModel):
@@ -96,6 +102,7 @@ class BookingIn(QuoteSave):
     accepted_policies: dict = {}
     pay_terms_accepted: bool = False
     tip: float = Field(0, ge=0, le=500)
+    auto_charge_consent: bool = False
     quote_id: Optional[str] = None
     origin_url: str
 
@@ -243,6 +250,9 @@ async def create_booking(body: BookingIn):
         raise HTTPException(422, "This booking needs a quick review by our team: " + " ".join(result["reasons"]))
     if len(q["address"].strip()) < 5:
         raise HTTPException(422, "Please enter the property address.")
+    recurring = q["service"] == "regular" and q.get("frequency") in ("weekly", "fortnightly", "monthly")
+    if recurring and not body.auto_charge_consent:
+        raise HTTPException(409, "Please agree to automatic card payments for your regular cleans.")
     a = body.access
     if a.method == "estate_agency" and not (a.agency_name.strip() and a.agency_address.strip()):
         raise HTTPException(422, "Please add the estate agency name and address for key collection.")
@@ -261,7 +271,8 @@ async def create_booking(body: BookingIn):
     else:
         quote_id = await store_quote(q, result, lead_id, lead["source"], status="booking_started")
     charge, tip = deposit_for(s, result["total"]), round(body.tip, 2)
-    booking = {"tip": tip, "pay_terms_confirmed_at": now_iso(), "lead_id": lead_id, "quote_id": quote_id, "customer": {k: contact[k] for k in ("name", "email", "phone")},
+    booking = {"tip": tip, "pay_terms_confirmed_at": now_iso(), "frequency": q.get("frequency") or None, "recurring": recurring,
+               "auto_charge_consent_at": now_iso() if recurring else None, "lead_id": lead_id, "quote_id": quote_id, "customer": {k: contact[k] for k in ("name", "email", "phone")},
                "postcode": q["postcode"].upper(), "address": q["address"].strip(), "service": q["service"], "service_name": result["service_name"], "input": q,
                "lines": result["lines"], "total": result["total"], "deposit_amount": charge, "balance_due": round(result["total"] - charge, 2),
                "payment_mode": s["business"].get("payment_mode", "full_upfront"), "date": body.date, "slot": body.slot,
@@ -283,6 +294,8 @@ async def create_booking(body: BookingIn):
                                            "product_data": {"name": "Tip for your cleaning team"}}}] if tip > 0 else []),
         success_url=f"{origin}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{origin}/payment/cancel?booking_id={booking_id}")
+    if recurring:
+        kwargs.update(customer_creation="always", payment_intent_data={"setup_future_usage": "off_session"})
     try:
         session = stripe.checkout.Session.create(**kwargs, automatic_tax={"enabled": True}, billing_address_collection="required")
     except stripe.error.StripeError:
@@ -308,6 +321,9 @@ async def finalize_booking(booking_id: str, paid: bool = True):
     if not res.modified_count:
         return
     b = await tdb.bookings.find_one({"_id": oid(booking_id)})
+    if b.get("recurring") and paid:
+        from routes_recurring import start_plan
+        await start_plan(b)
     s = await get_settings()
     when = f"{fmt_date(b['date'])} at {b['slot']} (ref {b.get('reference', '-')})"
     c = b["customer"]

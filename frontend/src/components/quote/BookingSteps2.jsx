@@ -97,7 +97,7 @@ const name = (list, key) => list.find(([k]) => k === key)?.[1];
 
 const TIPS = [0, 5, 10, 15];
 
-function TipPicker({ tip, setTip }) {
+export function TipPicker({ tip, setTip }) {
   const [other, setOther] = useState(false);
   const pill = (on) => `rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${on ? "border-[#023F00] bg-[#023F00] text-white" : "border-slate-300 bg-white text-slate-700 hover:border-[#8F7E22]"}`;
   return (
@@ -113,7 +113,7 @@ function TipPicker({ tip, setTip }) {
   );
 }
 
-const PayConfirm = ({ base, payOk, setPayOk }) => (
+export const PayConfirm = ({ base, payOk, setPayOk }) => (
   <label className="flex items-start gap-3 rounded-2xl border-2 border-[#023F00]/30 bg-[#023F00]/5 p-4 text-sm font-medium text-slate-800" data-testid="pay-terms-confirm">
     <Checkbox checked={payOk} onCheckedChange={(c) => setPayOk(!!c)} className="mt-0.5" data-testid="quote-pay-terms-checkbox" />
     <span>I have read and accept the <a href={`${base}/terms`} target="_blank" rel="noreferrer" className="font-semibold text-[#023F00] underline" data-testid="pay-terms-link">Terms and Conditions</a>, including the cancellation and refund policy.</span>
