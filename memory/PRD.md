@@ -28,7 +28,11 @@ Earlier history: started as an integrated Solid Clean system, then a multi-tenan
 
 - 2026-10-20 (round 4): admin and login rebranded "Solid Clean Ltd" (logo, green/gold); installable app (manifest.json, icons in /public/icons, sw.js, Install app button + help dialog, mobile sign-out); a shared BookingShell layout for /quote and /commercial-cleaning/request; the address is now asked at the END of every form; Commercial page rebuilt (hero, How it works, 10 premises cards linking to the 6-step walkthrough request: Premises → Requirements → Photos → Site visit → Your details → Address); selecting "Commercial / Office Cleaning" on /quote now routes to the walkthrough request instead of the residential property step (bug fix). Tests: iteration_6 + iteration_7 frontend 100%.
 
+- 2026-10-20 (round 5): user uploaded "TERMS AND CONDITIONS.pdf" ("Use this discard another this is terms policy company"). The old deposit-based Company Policy (terms v1) was replaced with the T&C published word for word as "Terms and Conditions" v2 (scripts/publish_terms_2026_10.py), and customers must accept it at checkout. FAQ "How do I pay?" / "Can I reschedule or cancel?" now use full-payment and tiered-refund wording (DB + seed.py), and seed payment_mode is now full_upfront. Checked: /terms and /policies show v2 with no deposit wording (desktop + mobile).
+
 ## Open questions
+- "Service guarantee, refunds & breakages" (published v1) says "does not offer refunds", which conflicts with the T&C tiered refunds. Owner decision needed: unpublish or reword
+- T&C says "Solid Clean" (not Ltd) and allows bank transfer, but online booking takes card payments through Stripe only
 - Freezer defrost "includes fridge/freezer cleaning" wording needs owner confirmation
 - Privacy policy still unpublished (draft); late-payment fee clause may need legal review
 

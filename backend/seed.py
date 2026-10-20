@@ -11,11 +11,11 @@ BUSINESS_DEFAULTS = {"phone": "[Business phone]", "logo_url": "", "brand_primary
                      "payment_instructions": "", "online_payments": True, "business_hours": "[Business hours]", "invoice_legal_name": "[Legal company name]",
                      "invoice_address": "[Registered address]", "company_number": "[Company number]", "vat_registered": False, "vat_number": "",
                      "about_text": "", "contact_email": "[Contact email]", "service_areas_text": "", "voice_number": ""}
-SOLID_V3_BUSINESS = {"owner_notify_email": "info@solidcleanltd.com", "contact_email": "info@solidcleanltd.com", "email": "info@solidcleanltd.com", "payment_mode": "deposit_50"}
+SOLID_V3_BUSINESS = {"owner_notify_email": "info@solidcleanltd.com", "contact_email": "info@solidcleanltd.com", "email": "info@solidcleanltd.com", "payment_mode": "full_upfront"}
 SOLID_V3_KB = {
     "Do I need to provide cleaning supplies?": "You can add cleaning supplies & equipment to your booking as an optional extra (£25), or provide your own.",
-    "Can I reschedule or cancel?": "Please give at least 48 hours' notice to reschedule. Cancellations made with less than 48 hours' notice will result in the deposit being forfeited. Full details are in our company policy.",
-    "How do I pay?": "A 50% deposit, paid securely by card through Stripe, confirms your booking. The remaining 50% is due immediately after the clean, by Stripe payment link or by card at the property. Cash is not accepted.",
+    "Can I reschedule or cancel?": "Cancellations with 7+ days' notice are eligible for a full refund, between 48 hours and 7 days' notice for a 50% refund, and with less than 48 hours' notice are non-refundable. One free reschedule is permitted if requested with at least 48 hours' notice. Full details are in our Terms and Conditions.",
+    "How do I pay?": "Full payment is required at the time of booking to secure the appointment, paid securely by card through Stripe. Full details are in our Terms and Conditions.",
 }
 
 
