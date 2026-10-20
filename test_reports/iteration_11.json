@@ -1,0 +1,53 @@
+{
+  "summary": "Iteration 11: tested the Residential Cleaning booking form, frequency pricing, recurring payments and the admin side. Backend: new suite test_iter11_residential_recurring.py passes 11/11 (pricing example 222.28 with the weekly 15% line, one-off no discount, fortnightly/monthly, factors, EoT unchanged, 409 without auto-charge consent, checkout with customer_creation=always, cron 401/ok/duplicate, off-session charge success + failing card -> payment_failed + customer/owner emails, next_date advances, far plans untouched, admin plan status owner-only). Regression: iter9 + iter10 pass 30/30. Real end-to-end: booked a weekly clean, paid Stripe test checkout with 4242, the success page confirmed it, start_plan created an active plan (next_date +7 days, saved customer + payment_method), the booking got recurring_plan_id, then the cron charged the REAL saved card off-session (child booking confirmed/paid, payment_transactions kind recurring). Frontend desktop: /quote Residential -> /residential-cleaning/book redirect works, every step gates res-next-btn correctly, the 5 core services are pre-ticked and 'Included', the per-item counters work, 'other' needs text, the live aside price updates (222.28 for the example), the review shows every answer + breakdown + total, the pay button needs terms + pay-terms + auto-charge (recurring only) and shows total+tip (227.28), and it redirects to Stripe. Admin booking detail Regular clean section: pause/resume/cancel all work. Settings residential panel: changing weekly to 20% and pets to 1.1 saved, persisted, changed the price (215.36) and the 'Save 20%' card text. It was restored to 15% / 1.05. Mobile 390: all 8 steps have no horizontal overflow, the stepper scrolls, and the mobile Call/Book bar is absent.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "admin cancel/refund booking", "issue": "Cancelling or refunding the FIRST booking of a regular clean does not pause/cancel its recurring_plan. The saved card keeps getting charged for future visits unless the owner also clicks 'Cancel regular clean'."},
+      {"endpoint": "POST /api/admin/recurring/{id}/status (resume)", "issue": "Resume sets status active without moving next_date forward. If a plan was paused past its next_date, the next cron run creates and charges a visit for a date in the past."},
+      {"endpoint": "routes_recurring._charge_visit", "issue": "If finalize_booking (or anything else) raises after the charge succeeds, next_date is not advanced. The 'booking already exists for this date' guard then returns early on every later run, so the plan is stuck forever: the customer is charged and the child booking stays pending_payment. I reproduced this with a plan missing quote_id. Advance next_date / mark the child in a finally block, or make the guard advance the date."},
+      {"endpoint": "routes_recurring._charge_visit", "issue": "Child visits skip slot capacity, working days and blocked dates, so they can overbook a slot or land on a non-working/blocked day (monthly dates drift). The reference prefix is hard-coded 'SO-' instead of the tenant slug used in create_booking."},
+      {"endpoint": "next_visit (monthly)", "issue": "The day is clamped to 28 and the clamped date is stored, so a plan starting on the 29th-31st drifts to the 28th permanently."},
+      {"endpoint": "recurring plan pricing", "issue": "The plan copies the first booking's total, so a one-time promo code discount is applied to every future visit. Price changes in Settings never reach existing plans (may be intended - please confirm)."},
+      {"endpoint": "pricing DEFAULT_SETTINGS / signup", "issue": "DEFAULT_SETTINGS has no pricing.residential (it was only added by a migration script for existing companies). New signup companies get no residential config: the Settings panel is hidden, and ResidentialBooking would crash on res.frequencies if used for that tenant."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Admin BookingDetail (residential booking)", "issue": "The customer's residential answers are not shown to staff: 'Other cleaning requests' text (input.other_request), the included services ticked (general/kitchen/...), people, last cleaned. The Property section shows the irrelevant EoT 'Condition: Well maintained'. The other_request text is also missing from the owner/customer confirmation emails, so the request is effectively lost.", "selector": "booking detail sheet", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Live price aside", "issue": "Preview requests are debounced but out-of-order responses are not ignored. Once, after clicking One-off then Weekly 900ms apart, the aside stayed at £87.00 for Weekly (the API returns 73.95). With 1.5s waits it was correct. Use an AbortController or a request-id guard.", "affected_selectors": ["quote-calculated-price-display"]}
+    ],
+    "design_issues": [
+      {"screen": "Residential review + QuoteSummary", "issues": ["Discount lines display as '£-39.23'. Should be '-£39.23'."]},
+      {"screen": "Mobile 390 review/aside", "issues": ["The floating 'Ask our receptionist' chat button covers the right-hand price amounts in res-price-breakdown and the quote aside (e.g. £8.00 and the discount amount are hidden)."]},
+      {"screen": "Admin Regular clean section", "issues": ["A cancelled plan still shows 'Next visit' and 'The saved card is charged automatically 2 days before each visit.' Hide or replace these when status is cancelled/paused."]},
+      {"screen": "Payment success page", "issues": ["For a recurring booking it does not mention the regular clean / next automatic visit date."]},
+      {"screen": "Stripe checkout", "issues": ["Adaptive pricing shows USD first with US as the default country for UK customers. Consider disabling adaptive pricing or presetting GB."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter11_residential_recurring.py", "/app/test_reports/pytest/pytest_iter11.xml"],
+  "action_items": [
+    "Show residential answers (other_request, included tasks, people, last cleaned, frequency) in admin BookingDetail and the owner/customer emails. Hide the EoT condition row for residential bookings",
+    "Cancel/pause the recurring plan (or prompt the owner) when the first booking is cancelled/refunded",
+    "On resume, roll next_date forward to the next future date",
+    "Make _charge_visit robust: always advance next_date / record the result even if finalize_booking fails; respect slot capacity/blocked days; use the tenant reference prefix",
+    "Add RESIDENTIAL to DEFAULT_SETTINGS['pricing'] for new tenants and guard ResidentialBooking when residential config is missing",
+    "Ignore stale quote/preview responses in ResidentialBooking",
+    "Format negative amounts as -£x.xx. Keep the chat bubble from overlapping prices on mobile"
+  ],
+  "critical_code_review_comments": [
+    "routes_recurring.start_plan: when the Session retrieve fails, the plan is created as needs_card with no way to attach a card later (resume is blocked). Consider a 'send card update link' flow (Stripe setup-mode Checkout).",
+    "_charge_visit: a PaymentIntent in requires_action (3DS/SCA - common for UK cards off-session) is treated as failed, but the customer isn't sent a link to authenticate. Consider emailing a payment link for requires_action.",
+    "run_recurring is sequential across all companies inside a single BackgroundTask. That's OK now, but add per-plan locking (e.g. findOneAndUpdate claiming next_date) to avoid double charges if two cron runs overlap with different X-Webhook-Ids.",
+    "Monthly next_visit clamps the day to 28 permanently."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter11_residential_recurring.py"],
+  "success_rate": {"backend": "100% (11/11 new + 30/30 regression)", "frontend": "95% (all flows work; 1 data-visibility bug in admin, minor UI issues)"},
+  "seed_data_creation": "None kept. TEST_ bookings, plans, transactions, leads, quotes, comms, cron_runs and Stripe test customers were deleted. The residential Settings were restored to weekly 15 / pets 1.05.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run with: REACT_APP_BACKEND_URL=... pytest backend/tests/test_iter11_residential_recurring.py -p no:xdist -o addopts=''. pytest.ini addopts use xdist and the env var isn't exported by default. The cron tests insert plans directly with Stripe test PMs (pm_card_visa, pm_card_chargeCustomerFail) and need quote_id set, otherwise finalize_booking 404s. The real flow is: POST bookings (weekly + consent) -> pay the checkout URL in Playwright (#cardNumber 4242..., #billingName, #billingCountry GB, 'Enter address manually', .SubmitButton) -> /payment/success finalizes -> recurring_plans doc. Pills testids are {prefix}-{key}, calendar days are '[data-testid=quote-calendar] button:not([disabled])', and slots are quote-slot-HHMM.",
+  "test_credentials": "Owner admin@solidcleanltd.com / SolidClean#2026 (from /app/memory/test_credentials.md) worked."
+}

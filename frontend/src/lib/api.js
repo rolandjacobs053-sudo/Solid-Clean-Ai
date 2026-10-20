@@ -12,7 +12,7 @@ export function errMsg(e) {
 }
 
 export const gbp = (n) =>
-  n == null ? "—" : `£${Number(n).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  n == null ? "—" : `${Number(n) < 0 ? "-" : ""}£${Math.abs(Number(n)).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const fmtDate = (iso) =>
   iso ? new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";

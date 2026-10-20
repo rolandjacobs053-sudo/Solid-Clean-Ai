@@ -42,6 +42,7 @@ export default function PaymentResult() {
           <p className="mt-4 text-slate-600">{booking.service_name} on <b>{fmtDate(booking.date)}</b> at <b>{booking.slot}</b>.</p>
           <p className="mt-2 font-mono text-2xl font-bold text-teal-700">{gbp(amount ?? booking.total)} {kind === "deposit" ? "deposit paid" : kind === "tip" ? "tip paid" : "paid"}</p>
           {kind === "deposit" && <p className="mt-2 text-sm text-slate-600">The remaining {gbp(booking.total - amount)} is due immediately after the clean.</p>}
+          {booking.recurring && <p className="mt-2 text-sm text-slate-600" data-testid="payment-recurring-note">Your regular {(booking.frequency || "").toLowerCase()} is set up. Each next visit is charged automatically to your saved card 2 days before.</p>}
           <p className="mt-4 text-sm text-slate-500">{kind === "tip" ? "We'll pass your thanks on to the team." : kind === "carpet" ? "Your booking is not confirmed until we approve the appointment. We'll be in touch shortly to confirm." : "A confirmation is on its way, and we'll send a reminder the day before."}</p>
         </div>
       )}

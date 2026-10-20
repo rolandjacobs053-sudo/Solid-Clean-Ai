@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { format } from "date-fns";
 import { CheckCircle2, Loader2, Repeat } from "lucide-react";
@@ -60,7 +60,7 @@ function Review({ res, p, form, date, slot, contact, access, photos, preview }) 
       <dl className="rounded-2xl border border-slate-200 bg-white p-5">{rows.filter(([, v]) => v).map(([k, v]) => <div key={k} className="flex justify-between gap-4 border-b border-slate-100 py-2 text-sm"><dt className="text-slate-500">{k}</dt><dd className="text-right font-medium text-slate-900">{v}</dd></div>)}</dl>
       {preview?.lines && <div className="rounded-2xl border border-slate-200 bg-white p-5" data-testid="res-price-breakdown">
         <h3 className="eyebrow">Price {form.frequency !== "one_off" ? "per visit" : ""}</h3>
-        <ul className="mt-3 space-y-1.5 text-sm">{preview.lines.map((l) => <li key={l.label} className="flex justify-between gap-3"><span>{l.label}</span><span className="font-mono">{gbp(l.amount)}</span></li>)}</ul>
+        <ul className="mt-3 space-y-1.5 pr-12 text-sm sm:pr-0">{preview.lines.map((l) => <li key={l.label} className="flex justify-between gap-3"><span>{l.label}</span><span className="font-mono">{gbp(l.amount)}</span></li>)}</ul>
         <div className="mt-3 flex justify-between border-t border-dashed pt-3 text-lg font-bold text-[#023F00]"><span>Total</span><span className="font-mono" data-testid="res-total">{gbp(preview.total)}</span></div>
       </div>}
     </div>
@@ -85,14 +85,17 @@ export default function ResidentialBooking() {
   const [autoOk, setAutoOk] = useState(false);
   const [busy, setBusy] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const reqId = useRef(0);
   useEffect(() => { api.get(`${pub}/config`).then((r) => setConfig(r.data)); }, [pub]);
   useEffect(() => {
     if (!form.frequency) return undefined;
-    const t = setTimeout(() => api.post(`${pub}/quote/preview`, { ...form, date: date ? format(date, "yyyy-MM-dd") : "" }).then((r) => setPreview(r.data)).catch(() => {}), 250);
+    const id = ++reqId.current;
+    const t = setTimeout(() => api.post(`${pub}/quote/preview`, { ...form, date: date ? format(date, "yyyy-MM-dd") : "" }).then((r) => { if (id === reqId.current) setPreview(r.data); }).catch(() => {}), 250);
     return () => clearTimeout(t);
   }, [form, pub, date]);
   if (!config) return <div className="p-16 text-center font-mono text-sm text-slate-500">Loading…</div>;
   const p = config.pricing, res = p.residential;
+  if (!res) return <div className="p-16 text-center text-slate-600">Online residential booking is not available yet. Please call us.</div>;
   const svc = p.services.find((s) => s.key === "regular");
   const policies = config.policies || [];
   const required = policies.filter((x) => x.require_acceptance);

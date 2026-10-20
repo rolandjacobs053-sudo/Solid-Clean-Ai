@@ -108,8 +108,8 @@ function RecurringPlan({ b }) {
   const setStatus = async (status) => { try { await api.post(`/admin/recurring/${plan.id}/status`, { status }); toast.success(`Regular clean ${status}`); load(); } catch (e) { toast.error(errMsg(e)); } };
   return (
     <Sec title="Regular clean" testid="booking-recurring">
-      <R k="Frequency" v={plan.frequency} /><R k="Status" v={<StatusBadge status={plan.status} />} /><R k="Next visit" v={fmtDate(plan.next_date)} /><R k="Price per visit" v={gbp(plan.total)} />
-      <p className="text-xs text-slate-500">The saved card is charged automatically 2 days before each visit.</p>
+      <R k="Frequency" v={plan.frequency} /><R k="Status" v={<StatusBadge status={plan.status} />} />{plan.status === "active" && <R k="Next visit" v={fmtDate(plan.next_date)} />}<R k="Price per visit" v={gbp(plan.total)} />
+      <p className="text-xs text-slate-500">{plan.status === "active" ? "The saved card is charged automatically 2 days before each visit." : plan.status === "paused" ? "Paused - no visits are created or charged until you resume." : "Cancelled - no more visits will be charged."}</p>
       <div className="mt-2 flex gap-2">
         {plan.status === "active" && <Button size="sm" variant="outline" onClick={() => setStatus("paused")} data-testid="recurring-pause-btn">Pause</Button>}
         {plan.status === "paused" && <Button size="sm" variant="outline" onClick={() => setStatus("active")} data-testid="recurring-resume-btn">Resume</Button>}
@@ -138,10 +138,17 @@ function Detail({ b, reload }) {
       <Sec title="Customer" testid="booking-detail-customer"><R k="Name" v={b.customer.name} /><R k="Phone" v={<a className="underline" href={`tel:${b.customer.phone}`}>{b.customer.phone}</a>} /><R k="Email" v={<a className="underline" href={`mailto:${b.customer.email}`}>{b.customer.email}</a>} /></Sec>
       <Sec title="Property" testid="booking-detail-property">
         <R k="Address" v={[b.address || i.address, b.postcode].filter(Boolean).join(", ")} />
+        {b.residential ? <>
+          <R k="Type" v={`${lab(i.property_type)} · ${i.bedrooms ?? "-"} bed · ${i.bathrooms ?? "-"} bath`} />
+          <R k="Frequency" v={b.residential.frequency} /><R k="People" v={b.residential.people} /><R k="Pets" v={lab(b.residential.pets)} /><R k="Last cleaned" v={b.residential.last_cleaned} />
+          <R k="Services" v={<span data-testid="booking-detail-res-services">{b.residential.services.join(", ")}</span>} />
+          {b.residential.other_request && <p className="mt-1 rounded-lg bg-amber-50 p-2 text-sm" data-testid="booking-detail-other-request"><b>Other requests:</b> {b.residential.other_request}</p>}
+        </> : <>
         <R k="Type" v={`${lab(i.property_type)} · ${i.bedrooms ?? "-"} bed · ${i.bathrooms ?? "-"} bath · ${i.living_rooms ?? "-"} living`} />
         <R k="Condition" v={lab(i.condition)} /><R k="Furnished" v={lab(i.furnished)} /><R k="Flooring" v={lab(i.flooring)} />
         <R k="Pets" v={`${lab(i.pets) || "-"}${i.pet_hair_odour ? " · significant pet hair/odour" : ""}`} />
         <R k="Additional areas" v={(i.additional_areas || []).join(", ")} />
+        </>}
         {i.property_notes && <p className="mt-1 rounded-lg bg-slate-50 p-2 text-sm">{i.property_notes}</p>}
       </Sec>
       <Sec title={`Customer photos (${photos ? photos.filter((p) => !p.kind).length : "…"})`} testid="booking-detail-photos">{photos ? <PhotoGrid photos={photos.filter((p) => !p.kind)} /> : <Loader2 className="h-4 w-4 animate-spin" />}</Sec>

@@ -1,4 +1,5 @@
 import asyncio
+import calendar
 import logging
 import os
 import secrets
@@ -9,7 +10,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from comms import add_event, log_comm
-from core import audit, company_name, db, get_settings, now, now_iso, oid, out, require_owner, set_tenant, tdb
+from core import audit, company_name, current_company, db, get_settings, now, now_iso, oid, out, require_owner, set_tenant, tdb
 from pricing import fmt_date
 
 logger = logging.getLogger(__name__)
@@ -19,13 +20,13 @@ DAYS = {"weekly": 7, "fortnightly": 14}
 CHARGE_DAYS_BEFORE = 2
 
 
-def next_visit(d: str, frequency: str) -> str:
+def next_visit(d: str, frequency: str, anchor_day: int = 0) -> str:
     cur = date.fromisoformat(d)
     if frequency in DAYS:
         return (cur + timedelta(days=DAYS[frequency])).isoformat()
     m = cur.month % 12 + 1
     y = cur.year + (cur.month == 12)
-    return cur.replace(year=y, month=m, day=min(cur.day, 28)).isoformat()
+    return date(y, m, min(anchor_day or cur.day, calendar.monthrange(y, m)[1])).isoformat()
 
 
 async def start_plan(b: dict):
@@ -35,8 +36,9 @@ async def start_plan(b: dict):
     except Exception:
         logger.exception("could not read saved card")
         pm = customer = None
-    keep = ("lead_id", "quote_id", "customer", "postcode", "address", "service", "service_name", "input", "lines", "total", "slot", "access", "access_notes", "source", "frequency")
-    plan = {**{k: b.get(k) for k in keep}, "first_booking_id": str(b["_id"]), "next_date": next_visit(b["date"], b["frequency"]),
+    keep = ("lead_id", "quote_id", "customer", "postcode", "address", "service", "service_name", "input", "lines", "total", "slot", "access", "access_notes", "source", "frequency", "residential")
+    anchor = date.fromisoformat(b["date"]).day
+    plan = {**{k: b.get(k) for k in keep}, "first_booking_id": str(b["_id"]), "anchor_day": anchor, "next_date": next_visit(b["date"], b["frequency"], anchor),
             "stripe_customer": customer, "payment_method": pm, "status": "active" if pm else "needs_card", "created_at": now_iso()}
     pid = str((await tdb.recurring_plans.insert_one(plan)).inserted_id)
     await tdb.bookings.update_one({"_id": b["_id"]}, {"$set": {"recurring_plan_id": pid}})
@@ -45,13 +47,22 @@ async def start_plan(b: dict):
 
 
 async def _charge_visit(plan: dict, s: dict):
+    try:
+        await _create_and_charge(plan, s)
+    finally:
+        await tdb.recurring_plans.update_one({"_id": plan["_id"], "next_date": plan["next_date"]},
+                                             {"$set": {"next_date": next_visit(plan["next_date"], plan["frequency"], plan.get("anchor_day", 0)), "last_run_at": now_iso()}})
+
+
+async def _create_and_charge(plan: dict, s: dict):
     from routes_public import finalize_booking, notify_owner
     when = plan["next_date"]
     if await tdb.bookings.find_one({"recurring_plan_id": str(plan["_id"]), "date": when}):
         return
-    b = {**{k: plan.get(k) for k in ("lead_id", "quote_id", "customer", "postcode", "address", "service", "service_name", "input", "lines", "total", "slot", "access", "access_notes", "source", "frequency")},
+    b = {**{k: plan.get(k) for k in ("lead_id", "quote_id", "customer", "postcode", "address", "service", "service_name", "input", "lines", "total", "slot", "access", "access_notes", "source", "frequency", "residential")},
          "recurring": False, "recurring_plan_id": str(plan["_id"]), "date": when, "deposit_amount": plan["total"], "balance_due": 0, "tip": 0, "payment_mode": "full_upfront",
-         "status": "pending_payment", "payment_status": "pending", "accepted_policies": {}, "reference": f"SO-{now().strftime('%y%m')}-{secrets.token_hex(3).upper()}", "created_at": now_iso()}
+         "status": "pending_payment", "payment_status": "pending", "accepted_policies": {}, "created_at": now_iso(),
+         "reference": f"{current_company.get()['slug'][:2].upper()}-{now().strftime('%y%m')}-{secrets.token_hex(3).upper()}"}
     bid = str((await tdb.bookings.insert_one(b)).inserted_id)
     c = b["customer"]
     try:
@@ -72,7 +83,7 @@ async def _charge_visit(plan: dict, s: dict):
                        f"Hi {c['name']}, we couldn't take the £{plan['total']:.2f} payment for your {plan['service_name']} on {fmt_date(when)} at {plan['slot']}. "
                        f"Please contact {company_name()} to update your card so we can keep your regular clean.", lead_id=plan["lead_id"])
         await notify_owner(s, f"Regular clean payment failed - {c['name']}", f"The automatic payment of £{plan['total']:.2f} for {fmt_date(when)} {plan['slot']} failed. The visit is not confirmed.", plan["lead_id"])
-    await tdb.recurring_plans.update_one({"_id": plan["_id"]}, {"$set": {"next_date": next_visit(when, plan["frequency"]), "last_run_at": now_iso(), "last_result": "paid" if ok else "failed"}})
+    await tdb.recurring_plans.update_one({"_id": plan["_id"]}, {"$set": {"last_result": "paid" if ok else "failed"}})
 
 
 async def run_recurring():
@@ -121,7 +132,10 @@ async def set_plan_status(plan_id: str, body: PlanStatus):
         raise HTTPException(400, "This regular clean can't be changed")
     if body.status == "active" and not p.get("payment_method"):
         raise HTTPException(400, "No saved card for this customer")
-    await tdb.recurring_plans.update_one({"_id": p["_id"]}, {"$set": {"status": body.status, "updated_at": now_iso()}})
+    nxt = p["next_date"]
+    while body.status == "active" and nxt <= now().date().isoformat():
+        nxt = next_visit(nxt, p["frequency"], p.get("anchor_day", 0))
+    await tdb.recurring_plans.update_one({"_id": p["_id"]}, {"$set": {"status": body.status, "next_date": nxt, "updated_at": now_iso()}})
     await add_event(p["lead_id"], "booking", f"Regular {p['frequency']} clean {body.status}")
     await audit("recurring.status", f"{p['customer']['name']} {body.status}")
     return {"ok": True}

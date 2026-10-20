@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from comms import add_event, booking_link, log_comm, quote_email, upsert_lead
 from core import access_state, company_name, current_company, db, get_settings, now, now_iso, oid, out, plan_features, set_tenant, tdb
-from pricing import compute_quote, fmt_date, slots_for
+from pricing import compute_quote, fmt_date, residential_summary, slots_for
 from storage import attach_photos
 
 
@@ -272,6 +272,7 @@ async def create_booking(body: BookingIn):
         quote_id = await store_quote(q, result, lead_id, lead["source"], status="booking_started")
     charge, tip = deposit_for(s, result["total"]), round(body.tip, 2)
     booking = {"tip": tip, "pay_terms_confirmed_at": now_iso(), "frequency": q.get("frequency") or None, "recurring": recurring,
+               "residential": residential_summary(s["pricing"], q),
                "auto_charge_consent_at": now_iso() if recurring else None, "lead_id": lead_id, "quote_id": quote_id, "customer": {k: contact[k] for k in ("name", "email", "phone")},
                "postcode": q["postcode"].upper(), "address": q["address"].strip(), "service": q["service"], "service_name": result["service_name"], "input": q,
                "lines": result["lines"], "total": result["total"], "deposit_amount": charge, "balance_due": round(result["total"] - charge, 2),
@@ -334,12 +335,15 @@ async def finalize_booking(booking_id: str, paid: bool = True):
     await tdb.leads.update_one({"_id": oid(b["lead_id"])}, {"$set": {"status": "booked"}})
     await tdb.quotes.update_one({"_id": oid(b["quote_id"])}, {"$set": {"status": "accepted"}})
     await add_event(b["lead_id"], "booking", f"Booking confirmed ({'deposit paid' if deposit else 'paid'}): {b['service_name']} {when} (£{b['total']:.2f})")
+    r = b.get("residential")
+    res_text = (f" Services: {', '.join(r['services'])}." + (f" Other requests: {r['other_request']}." if r["other_request"] else "")) if r else ""
+    regular = f" Your regular {r['frequency'].lower()} is set up - each next visit is charged automatically to your saved card 2 days before." if r and b.get("recurring") else ""
     await log_comm(c["email"], "email", "booking_confirmation", f"Booking confirmed - {when}",
-                   f"Hi {c['name']}, your {b['service_name']} is confirmed for {when} at {b.get('address') or ''} {b['postcode']}. {pay_text} "
+                   f"Hi {c['name']}, your {b['service_name']} is confirmed for {when} at {b.get('address') or ''} {b['postcode']}. {pay_text}{res_text}{regular} "
                    "To reschedule, please give us at least 48 hours' notice. Our company policy applies to this booking.", lead_id=b["lead_id"])
     await log_comm(c["phone"], "sms", "booking_confirmation", "Booking confirmed",
                    f"{company_name()}: your clean is confirmed for {when}. Reply or call us to make changes.", lead_id=b["lead_id"])
-    await notify_owner(s, f"New booking - {when}", f"{c['name']} {c['phone']} - {b['service_name']} at {b.get('address') or ''} {b['postcode']}, total £{b['total']:.2f}. {pay_text} Access: {b.get('access_notes') or '-'}", b["lead_id"])
+    await notify_owner(s, f"New booking - {when}", f"{c['name']} {c['phone']} - {b['service_name']} at {b.get('address') or ''} {b['postcode']}, total £{b['total']:.2f}. {pay_text}{res_text} Access: {b.get('access_notes') or '-'}", b["lead_id"])
     remind_at = (date.fromisoformat(b["date"]) - timedelta(days=1)).isoformat() + "T17:00:00+00:00"
     await log_comm(c["phone"], "sms", "appointment_reminder", "Reminder",
                    f"Reminder: {company_name()} is booked for {when}. Please ensure access as discussed.", lead_id=b["lead_id"], scheduled_for=remind_at)
@@ -422,7 +426,8 @@ async def payment_status(session_id: str):
         await settle_tx(tx, tx["booking_id"])
     b = await tdb.bookings.find_one({"_id": oid(tx["booking_id"])})
     return {"session_id": session_id, "status": tx["status"], "payment_status": tx["payment_status"], "kind": tx.get("kind", "booking"), "amount": tx["amount"],
-            "booking": {"service_name": b["service_name"], "date": b["date"], "slot": b["slot"], "total": b["total"], "reference": b.get("reference")}}
+            "booking": {"service_name": b["service_name"], "date": b["date"], "slot": b["slot"], "total": b["total"], "reference": b.get("reference"),
+                        "recurring": bool(b.get("recurring")), "frequency": (b.get("residential") or {}).get("frequency")}}
 
 
 @router.post("/stripe/webhook")

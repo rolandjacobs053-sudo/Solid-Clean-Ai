@@ -112,6 +112,22 @@ def _item_line(item: dict, qtys: dict) -> dict:
     return {"label": item["name"] + (f" × {n}" if item.get("per_item") else ""), "amount": round(price * n, 2)}
 
 
+DEFAULT_SETTINGS["pricing"]["residential"] = RESIDENTIAL
+
+
+def residential_summary(pricing: dict, q: dict):
+    res = pricing.get("residential") or RESIDENTIAL
+    if not (q.get("frequency") and q.get("service") == "regular"):
+        return None
+
+    def name(rows, key):
+        return next((r["name"] for r in rows if r["key"] == key), key)
+    qty = q.get("task_qty") or {}
+    return {"frequency": name(res["frequencies"], q["frequency"]), "people": name(res["people"], q.get("people")), "last_cleaned": name(res["last_cleaned"], q.get("last_cleaned")),
+            "pets": q.get("pets") or "no", "other_request": (q.get("other_request") or "").strip(),
+            "services": [t["name"] + (f" × {qty.get(t['key'], 1)}" if t.get("per_item") else "") for t in res["tasks"] if t["key"] in (q.get("tasks") or [])]}
+
+
 def postcode_prefix(postcode: str) -> str:
     m = re.match(r"^\s*([A-Za-z]{1,2})", postcode or "")
     return m.group(1).upper() if m else ""

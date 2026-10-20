@@ -242,6 +242,11 @@ async def tip_request(booking_id: str, request: Request):
 
 
 async def _cancel_effects(b: dict, refund: Optional[dict] = None):
+    if b.get("recurring_plan_id"):
+        plan = await tdb.recurring_plans.find_one({"_id": oid(b["recurring_plan_id"]), "first_booking_id": str(b["_id"]), "status": {"$ne": "cancelled"}})
+        if plan:
+            await tdb.recurring_plans.update_one({"_id": plan["_id"]}, {"$set": {"status": "cancelled", "updated_at": now_iso()}})
+            await add_event(b["lead_id"], "booking", f"Regular {plan['frequency']} clean cancelled with the first booking")
     c, when = b["customer"], f"{fmt_date(b['date'])} {b['slot']}"
     if refund is None:
         event = f"Booking cancelled: {when}. Any refund must be approved and issued manually in Stripe."
