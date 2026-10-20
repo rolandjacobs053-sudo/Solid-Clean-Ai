@@ -42,7 +42,7 @@ export const FIELD_LABELS = Object.fromEntries([...COUNTS, ...Object.values(EXTR
 const STEPS = ["Premises", "Requirements", "Photos", "Site visit", "Your details", "Address"];
 const TITLES = ["What type of premises?", "Your cleaning requirements", "Upload Photos of Your Premises", "When Would You Like Us to Visit?", "Your contact details", "Premises address"];
 const CONFIRM = "Thank you for contacting Solid Clean Ltd. We have received your request for a free commercial cleaning site walkthrough. Our team will review your details and contact you to confirm a suitable date and time. The walkthrough is free and there is no obligation to proceed.";
-const tomorrow = () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); };
+const tomorrow = () => { const d = new Date(); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const label = (list, k) => list.find(([x]) => x === k)?.[1];
 
 const F = ({ id, label: l, value, onChange, type = "text", area }) => (
@@ -54,7 +54,7 @@ const Q = ({ l, children }) => <div><Label className="eyebrow">{l}</Label>{child
 
 function Aside({ type, det, sch, visit }) {
   const rows = [["Premises", label(TYPES, type)], ["Cleaning", label(CLEAN_TYPES, det.cleaning_type)], ["Frequency", label(FREQ, sch.frequency)], ["Size", det.size],
-    ["Visit requested", visit.preferred_date && `${new Date(visit.preferred_date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })} ${visit.preferred_time}`]];
+    ["Visit requested", visit.preferred_date && `${new Date(`${visit.preferred_date}T12:00:00`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })} ${visit.preferred_time}`]];
   return (
     <aside className="sticky top-24 rounded-3xl border border-slate-200 bg-white p-6" data-testid="wt-summary">
       <p className="eyebrow">Your free site visit</p>
@@ -70,7 +70,8 @@ export default function CommercialRequest() {
   const [params] = useSearchParams();
   const pub = `/public/${DEFAULT_SLUG}`;
   const [step, setStep] = useState(0);
-  const [type, setType] = useState(params.get("type") || "");
+  const initial = TYPES.some(([k]) => k === params.get("type")) ? params.get("type") : "";
+  const [type, setType] = useState(initial);
   const [det, setDet] = useState({ floors: 1, rooms: 1, toilets: 1, kitchens: 0 });
   const [sch, setSch] = useState({ frequency: "", days: [], time: "", start_date: "", notes: "" });
   const [visit, setVisit] = useState({ preferred_date: "", preferred_time: "", alt_date: "", alt_time: "", access_info: "" });
@@ -80,7 +81,7 @@ export default function CommercialRequest() {
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
-  useEffect(() => { if (params.get("type")) setStep(1); }, [params]);
+  useEffect(() => { if (initial) setStep(1); }, [initial]);
   const d = (k) => (v) => setDet({ ...det, [k]: v });
   const canNext = [!!type, !!det.cleaning_type && !!sch.frequency, !photos.some((p) => p.status === "uploading"), !!visit.preferred_date && !!visit.preferred_time,
     c.name && c.business_name && c.phone.length >= 6 && /\S+@\S+\.\S+/.test(c.email), addr.address.trim().length >= 5 && /^[A-Za-z]{1,2}\d/.test(addr.postcode.trim())][step];

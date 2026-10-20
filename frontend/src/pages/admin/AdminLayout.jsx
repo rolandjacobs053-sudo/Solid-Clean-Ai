@@ -33,7 +33,7 @@ export default function AdminLayout() {
             <p className="mt-3 truncate font-display text-base font-bold text-white" data-testid="admin-company-name">{c.slug === "solid-clean" ? "Solid Clean Ltd" : c.name}</p>
             <p className="font-mono text-[10px] uppercase tracking-wider text-[#d9c56a]">Business dashboard</p>
             <a href="/" target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1 font-mono text-[10px] text-white/60 hover:text-white" data-testid="admin-booking-page-link">View website <ExternalLink className="h-3 w-3" /></a>
-            <div className="mt-3"><InstallApp /></div>
+            <div className="mt-3 flex items-center gap-2"><div className="flex-1"><InstallApp /></div><button onClick={logout} className="flex items-center gap-1 rounded-md border border-white/20 px-3 py-1.5 text-xs text-white/80 hover:text-white lg:hidden" data-testid="admin-logout-mobile-btn"><LogOut className="h-3.5 w-3.5" />Sign out</button></div>
           </div>
           <nav className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-1 lg:flex-col lg:overflow-y-auto">
             {NAV.filter(allowed).map(([to, t, Icon]) => (

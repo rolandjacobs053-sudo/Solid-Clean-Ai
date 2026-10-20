@@ -43,10 +43,10 @@ export default function AdminLogin() {
           <div><Label htmlFor="email">Email</Label><Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="mt-2 h-11" data-testid="admin-login-email-input" /></div>
           <div><Label htmlFor="pw">Password</Label><Input id="pw" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="mt-2 h-11" data-testid="admin-login-password-input" /></div>
           {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700" data-testid="admin-login-error">{error}</p>}
-          <Button disabled={busy} className="h-11 w-full rounded-full bg-slate-900 hover:bg-teal-700 hover:text-white" data-testid="admin-login-submit-btn">
+          <Button disabled={busy} className="h-11 w-full rounded-full bg-[#023F00] text-white hover:bg-[#8F7E22]" data-testid="admin-login-submit-btn">
             {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Sign in
           </Button>
-          {open && <p className="text-center text-sm text-slate-500">New cleaning company? <Link to="/signup" className="font-medium text-teal-700 hover:underline" data-testid="login-signup-link">Start a 14-day free trial</Link></p>}
+          {open && <p className="text-center text-sm text-slate-500">New cleaning company? <Link to="/signup" className="font-medium text-[#023F00] hover:underline" data-testid="login-signup-link">Start a 14-day free trial</Link></p>}
         </form>
       </div>
     </main>
