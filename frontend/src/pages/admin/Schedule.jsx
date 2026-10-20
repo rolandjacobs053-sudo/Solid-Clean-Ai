@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Clock, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DemoTag, PageHeader, StatusBadge, useLoad } from "@/components/admin/ui";
+import { BookingDetail } from "@/components/admin/BookingDetail";
+import { DemoTag, PageHeader, useLoad } from "@/components/admin/ui";
 import { useAuth } from "@/context/AuthContext";
-import { api, fmtDate, gbp } from "@/lib/api";
+import { api, fmtDate } from "@/lib/api";
 
 const COLORS = ["#0F766E", "#B45309", "#7C3AED", "#BE123C", "#1D4ED8", "#4D7C0F", "#C2410C"];
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -22,26 +22,6 @@ function JobCard({ b, color, onOpen }) {
       <p className="mt-1 flex items-center gap-1 font-mono text-[10px] text-slate-500"><MapPin className="h-3 w-3" />{b.postcode}</p>
       <p className="mt-2 truncate font-mono text-[10px] font-semibold uppercase" style={{ color }} data-testid={`schedule-job-assignee-${b.id}`}>{b.assigned_name || "Unassigned"}</p>
     </button>
-  );
-}
-
-function JobDialog({ b, onClose }) {
-  return (
-    <Dialog open={!!b} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent data-testid="schedule-job-dialog">
-        {b && <>
-          <DialogHeader><DialogTitle>{b.service_name}</DialogTitle></DialogHeader>
-          <div className="space-y-2 text-sm">
-            <p className="font-mono">{fmtDate(b.date)} · {b.slot} · ref {b.reference || "-"}</p>
-            <p><b>{b.customer.name}</b> · {b.customer.phone}</p>
-            <p>{b.postcode}</p>
-            {b.access_notes && <p className="rounded-lg bg-amber-50 p-2 text-amber-900">Access notes: {b.access_notes}</p>}
-            <p>Assigned to: <b>{b.assigned_name || "Unassigned"}</b></p>
-            <div className="flex items-center gap-2"><StatusBadge status={b.status} /><StatusBadge status={b.payment_status} /><span className="ml-auto font-mono">{gbp(b.total)}</span></div>
-          </div>
-        </>}
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -92,7 +72,7 @@ export default function Schedule() {
           );
         })}
       </div>
-      <JobDialog b={open} onClose={() => setOpen(null)} />
+      <BookingDetail b={open} onClose={() => setOpen(null)} />
     </div>
   );
 }

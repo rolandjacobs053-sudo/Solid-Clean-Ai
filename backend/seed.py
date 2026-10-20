@@ -11,6 +11,12 @@ BUSINESS_DEFAULTS = {"phone": "[Business phone]", "logo_url": "", "brand_primary
                      "payment_instructions": "", "online_payments": True, "business_hours": "[Business hours]", "invoice_legal_name": "[Legal company name]",
                      "invoice_address": "[Registered address]", "company_number": "[Company number]", "vat_registered": False, "vat_number": "",
                      "about_text": "", "contact_email": "[Contact email]", "service_areas_text": "", "voice_number": ""}
+SOLID_V3_BUSINESS = {"owner_notify_email": "info@solidcleanltd.com", "contact_email": "info@solidcleanltd.com", "email": "info@solidcleanltd.com", "payment_mode": "deposit_50"}
+SOLID_V3_KB = {
+    "Do I need to provide cleaning supplies?": "You can add cleaning supplies & equipment to your booking as an optional extra (£25), or provide your own.",
+    "Can I reschedule or cancel?": "Please give at least 48 hours' notice to reschedule. Cancellations made with less than 48 hours' notice will result in the deposit being forfeited. Full details are in our company policy.",
+    "How do I pay?": "A 50% deposit, paid securely by card through Stripe, confirms your booking. The remaining 50% is due immediately after the clean, by Stripe payment link or by card at the property. Cash is not accepted.",
+}
 
 
 async def migrate_company(company: dict):
@@ -28,10 +34,32 @@ async def migrate_company(company: dict):
             have = {x["key"] for x in p["extras"]}
             p["extras"] += [e for e in DEFAULT_SETTINGS["pricing"]["extras"] if e["key"] not in have]
             await db.settings.update_one({"_id": s["_id"]}, {"$set": {"extras_v2": True}})
+        biz_extra = {}
+        if not s.get("extras_v3"):
+            defaults = DEFAULT_SETTINGS["pricing"]["extras"]
+            for x in p["extras"]:
+                d = next((e for e in defaults if e["key"] == x["key"]), None)
+                if x["key"] == "fridge" and d:
+                    x.update(name=d["name"], description=d["description"])
+            have = {x["key"] for x in p["extras"]}
+            p["extras"] += [e for e in defaults if e["key"] not in have]
+            order = [e["key"] for e in defaults]
+            p["extras"].sort(key=lambda e: order.index(e["key"]) if e["key"] in order else 99)
+            for svc in p["services"]:
+                if svc["key"] in ("regular", "end_of_tenancy"):
+                    svc["extras"] = [e["key"] for e in p["extras"]]
+            if company["slug"] == "solid-clean":
+                biz_extra = SOLID_V3_BUSINESS
+                kb = {k["q"]: k for k in s["knowledge_base"]}
+                for q, a in SOLID_V3_KB.items():
+                    if q in kb:
+                        kb[q]["a"] = a
+                await db.settings.update_one({"_id": s["_id"]}, {"$set": {"knowledge_base": s["knowledge_base"]}})
+            await db.settings.update_one({"_id": s["_id"]}, {"$set": {"extras_v3": True}})
         p.pop("parking_surcharge", None)
         p.setdefault("short_notice", {"days": 2, "type": "percent", "value": 0})
         p.setdefault("promo_codes", [])
-        biz = {**BUSINESS_DEFAULTS, **(SOLID_BUSINESS if company["slug"] == "solid-clean" else {}), **s["business"]}
+        biz = {**BUSINESS_DEFAULTS, **(SOLID_BUSINESS if company["slug"] == "solid-clean" else {}), **s["business"], **biz_extra}
         biz.pop("booking_page", None)
         await db.settings.update_one({"_id": s["_id"]}, {"$set": {"pricing": p, "business": biz}})
     for col in ("quotes", "bookings"):

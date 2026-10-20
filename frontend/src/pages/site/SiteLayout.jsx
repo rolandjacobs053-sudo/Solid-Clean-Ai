@@ -13,6 +13,30 @@ const LEGAL = [["/policies", "Company policies"], ["/privacy", "Privacy policy"]
 export const BookBtn = ({ children = "Book a Cleaning", className = "", testid = "book-cleaning-btn" }) => (
   <Link to="/quote" data-testid={testid} className={`inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold text-white transition-transform hover:-translate-y-0.5 ${className}`} style={{ background: G }}>{children}</Link>
 );
+export const tel = (phone) => `tel:${(phone || "").replace(/\s/g, "")}`;
+export const CallBtn = ({ phone, className = "", testid = "call-btn", label }) => (
+  <a href={tel(phone)} data-testid={testid} className={`inline-flex items-center justify-center gap-2 rounded-full border-2 px-6 py-3 text-sm font-semibold transition-colors hover:bg-[#8F7E22]/10 ${className}`} style={{ borderColor: GOLD, color: G }}><Phone className="h-4 w-4" />{label || `Call ${phone}`}</a>
+);
+
+function CallStrip({ b }) {
+  return (
+    <div className="text-white" style={{ background: G }} data-testid="site-call-strip">
+      <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 py-2 text-xs sm:justify-between sm:text-sm lg:px-8">
+        <span className="hidden sm:inline">Professional cleaning{b.service_areas_text ? ` across ${b.service_areas_text}` : ""} · Fully insured</span>
+        <a href={tel(b.phone)} className="flex items-center gap-2 font-semibold" data-testid="call-strip-phone"><Phone className="h-3.5 w-3.5" style={{ color: "#d9c56a" }} />Speak to our team: <span className="font-mono">{b.phone}</span></a>
+      </div>
+    </div>
+  );
+}
+
+function MobileCallBar({ b }) {
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-2 gap-2 border-t border-slate-200 bg-white/95 p-3 backdrop-blur-xl md:hidden" data-testid="mobile-call-bar">
+      <a href={tel(b.phone)} className="flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold text-white" style={{ background: GOLD }} data-testid="mobile-call-btn"><Phone className="h-4 w-4" />Call us</a>
+      <BookBtn className="!py-3" testid="mobile-bar-book-btn">Book online</BookBtn>
+    </div>
+  );
+}
 
 function Header({ b }) {
   const [open, setOpen] = useState(false);
@@ -25,15 +49,18 @@ function Header({ b }) {
         <Link to="/" data-testid="site-logo"><img src={b.logo_url || "/brand/solidclean-logo.png"} alt={b.name} className="h-14 w-auto" /></Link>
         <nav className="hidden items-center gap-6 lg:flex">{NAV.map(([to, t]) => <NavLink key={to} to={to} className={link} data-testid={`site-nav-${to.slice(1)}`}>{t}</NavLink>)}</nav>
         <div className="hidden items-center gap-3 md:flex">
-          {b.phone && <a href={`tel:${b.phone.replace(/\s/g, "")}`} className="flex items-center gap-1.5 font-mono text-sm font-semibold" style={{ color: G }} data-testid="site-phone"><Phone className="h-4 w-4" />{b.phone}</a>}
+          {b.phone && <a href={tel(b.phone)} className="flex items-center gap-2 rounded-full border-2 px-4 py-2 font-mono text-sm font-semibold transition-colors hover:bg-[#8F7E22]/10" style={{ color: G, borderColor: GOLD }} data-testid="site-phone"><Phone className="h-4 w-4" />{b.phone}</a>}
           <BookBtn className="!px-5 !py-2.5" testid="header-book-btn" />
         </div>
-        <button className="lg:hidden" onClick={() => setOpen(!open)} data-testid="site-menu-btn">{open ? <X /> : <Menu />}</button>
+        <div className="flex items-center gap-3 lg:hidden">
+          {b.phone && <a href={tel(b.phone)} className="rounded-full p-2.5 text-white md:hidden" style={{ background: GOLD }} aria-label="Call us" data-testid="header-call-icon"><Phone className="h-4 w-4" /></a>}
+          <button onClick={() => setOpen(!open)} data-testid="site-menu-btn">{open ? <X /> : <Menu />}</button>
+        </div>
       </div>
       {open && (
         <nav className="space-y-1 border-t bg-white px-4 py-4 lg:hidden" data-testid="site-mobile-nav">
           {NAV.map(([to, t]) => <NavLink key={to} to={to} className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-50">{t}</NavLink>)}
-          <div className="flex gap-2 pt-2"><BookBtn className="flex-1" testid="mobile-book-btn" /></div>
+          <div className="flex gap-2 pt-2"><BookBtn className="flex-1" testid="mobile-book-btn" />{b.phone && <CallBtn phone={b.phone} className="flex-1" testid="mobile-menu-call-btn" label="Call us" />}</div>
         </nav>
       )}
     </header>
@@ -62,10 +89,12 @@ export default function SiteLayout() {
   useEffect(() => { api.get(`/public/${DEFAULT_SLUG}/config`).then((r) => setCfg(r.data)).catch(() => {}); }, []);
   if (!cfg) return <div className="p-16 text-center font-mono text-sm text-slate-400">Loading…</div>;
   return (
-    <div className="brand-site" data-testid="public-site">
+    <div className="brand-site pb-20 md:pb-0" data-testid="public-site">
+      {cfg.business.phone && <CallStrip b={cfg.business} />}
       <Header b={cfg.business} />
       <Outlet context={cfg} />
       <Footer b={cfg.business} />
+      {cfg.business.phone && <MobileCallBar b={cfg.business} />}
       {cfg.ai_receptionist && <ChatWidget />}
     </div>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useOutletContext, useParams } from "react-router-dom";
-import { BadgeCheck, CalendarCheck, CreditCard, MapPin, ShieldCheck, Sparkles, Star } from "lucide-react";
+import { BadgeCheck, CalendarCheck, Camera, CreditCard, MapPin, Phone, ShieldCheck, Star } from "lucide-react";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { api, errMsg, fmtDate, gbp } from "@/lib/api";
 import { DEFAULT_SLUG } from "@/lib/tenant";
-import { BookBtn, G, GOLD } from "@/pages/site/SiteLayout";
+import { BookBtn, CallBtn, G, GOLD, tel } from "@/pages/site/SiteLayout";
 
 const IMG = {
   standard: "https://images.unsplash.com/photo-1639173925921-5d5fd027713c?crop=entropy&cs=srgb&fm=jpg&q=80&w=1000",
@@ -57,10 +57,10 @@ export function HomePage() {
           <div>
             <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] rise" style={{ color: GOLD }}>Professional cleaning{b.service_areas_text ? ` · ${b.service_areas_text}` : ""}</p>
             <h1 className="mt-5 text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl rise rise-1" style={{ color: G }}>A spotless space,<br />booked in minutes.</h1>
-            <p className="mt-6 max-w-lg text-base text-slate-600 sm:text-lg rise rise-2">See your exact price, choose a genuinely available appointment and pay securely online.</p>
-            <div className="mt-9 flex flex-wrap gap-3 rise rise-3"><BookBtn testid="hero-book-btn" /></div>
+            <p className="mt-6 max-w-lg text-base text-slate-600 sm:text-lg rise rise-2">See your exact price online, upload photos of your property and choose a genuinely available appointment - or simply call us and we'll help you choose the right clean.</p>
+            <div className="mt-9 flex flex-wrap gap-3 rise rise-3"><BookBtn testid="hero-book-btn" />{b.phone && <CallBtn phone={b.phone} testid="hero-call-btn" />}</div>
             <div className="mt-10 flex flex-wrap gap-6 text-sm text-slate-700">
-              {[[ShieldCheck, "Vetted cleaners"], [BadgeCheck, "Clear upfront prices"], [CreditCard, "Secure Stripe payment"]].map(([I, t]) => <span key={t} className="flex items-center gap-2"><I className="h-4 w-4" style={{ color: GOLD }} />{t}</span>)}
+              {[[ShieldCheck, "Fully insured"], [BadgeCheck, "Uniformed, professional team"], [CreditCard, "Secure Stripe card payment"]].map(([I, t]) => <span key={t} className="flex items-center gap-2"><I className="h-4 w-4" style={{ color: GOLD }} />{t}</span>)}
             </div>
           </div>
           <img src={IMG.end_of_tenancy} alt="Freshly cleaned room" className="aspect-[4/3] w-full rounded-[2rem] object-cover shadow-2xl" />
@@ -70,9 +70,24 @@ export function HomePage() {
         <h2 className="text-2xl font-bold sm:text-3xl" style={{ color: G }}>Our cleaning services</h2>
         <div className="mt-10"><ServiceGrid cfg={cfg} /></div>
       </section>
+      {b.phone && (
+        <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8" data-testid="home-call-band">
+          <div className="grid items-center gap-8 rounded-[2rem] border-2 p-8 sm:p-12 lg:grid-cols-[1.4fr_1fr]" style={{ borderColor: GOLD, background: "#fbf9f1" }}>
+            <div>
+              <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: GOLD }}>Talk to a real person</p>
+              <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl" style={{ color: G }}>Not sure which clean you need? Give us a call.</h2>
+              <p className="mt-4 max-w-xl text-slate-600">Our team will talk you through the options, answer your questions and book your clean for you.</p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <a href={tel(b.phone)} className="flex items-center justify-center gap-3 rounded-full py-4 text-xl font-bold text-white transition-transform hover:-translate-y-0.5 sm:text-2xl" style={{ background: G }} data-testid="home-call-band-btn"><Phone className="h-6 w-6" style={{ color: "#d9c56a" }} /><span className="font-mono">{b.phone}</span></a>
+              <BookBtn testid="home-call-band-book-btn">Or book online in minutes</BookBtn>
+            </div>
+          </div>
+        </section>
+      )}
       <section className="py-16 text-white" style={{ background: G }}>
         <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 md:grid-cols-4 lg:px-8">
-          {[[Sparkles, "Get your price", "Tell us about the property"], [CalendarCheck, "Pick a time", "Only available slots are shown"], [CreditCard, "Pay securely", "Full payment confirms your booking"], [BadgeCheck, "Relax", "Confirmation and reminder sent"]].map(([I, t, d], i) => (
+          {[[Camera, "Tell us about the property", "Add details and photos"], [CalendarCheck, "Pick a time", "Only available slots are shown"], [CreditCard, "Pay securely", b.payment_mode === "deposit_50" ? "A 50% deposit confirms your booking" : "Full payment confirms your booking"], [BadgeCheck, "Relax", "Confirmation and reminder sent"]].map(([I, t, d], i) => (
             <div key={t} className="border-l border-white/20 pl-5"><span className="font-mono text-xs text-white/50">0{i + 1}</span><I className="mt-3 h-6 w-6" style={{ color: "#d9c56a" }} /><h3 className="mt-3 font-display text-lg font-semibold">{t}</h3><p className="text-sm text-white/70">{d}</p></div>
           ))}
         </div>

@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from ai import ai_complete
@@ -128,6 +128,7 @@ async def get_lead(lead_id: str):
             "quotes": outs(await tdb.quotes.find({"lead_id": lead_id}).sort("created_at", -1).to_list(50)),
             "bookings": outs(await tdb.bookings.find({"lead_id": lead_id}).sort("created_at", -1).to_list(50)),
             "conversations": outs(await tdb.conversations.find({"lead_id": lead_id}, {"messages": 0}).to_list(20)),
+            "photos": outs(await tdb.photos.find({"lead_id": lead_id, "status": "attached", "is_deleted": False}, {"token": 0, "path": 0}).to_list(50)),
             "communications": outs(await tdb.communications.find({"lead_id": lead_id}).sort("created_at", -1).to_list(50))}
 
 
@@ -152,6 +153,29 @@ async def list_bookings(status: str = "", date_from: str = "", date_to: str = ""
     return outs(await tdb.bookings.find(query).sort([("date", -1), ("slot", 1)]).to_list(500))
 
 
+@router.post("/bookings/{booking_id}/balance-link", dependencies=[Depends(require_owner)])
+async def balance_link(booking_id: str, request: Request):
+    import stripe
+    from comms import booking_link
+    b = await tdb.bookings.find_one({"_id": oid(booking_id)})
+    if not b or b.get("payment_status") != "deposit_paid" or not b.get("balance_due"):
+        raise HTTPException(400, "There is no outstanding balance on this booking")
+    origin = booking_link(request, "x", "x")[1].split("/c/")[0]
+    session = stripe.checkout.Session.create(
+        mode="payment", customer_email=b["customer"]["email"], metadata={"booking_id": booking_id, "kind": "balance"},
+        line_items=[{"quantity": 1, "price_data": {"currency": "gbp", "unit_amount": int(round(b["balance_due"] * 100)), "tax_behavior": "inclusive",
+                     "product_data": {"name": f"Balance - {b['service_name']} {fmt_date(b['date'])} (ref {b.get('reference')})"}}}],
+        success_url=f"{origin}/payment/success?session_id={{CHECKOUT_SESSION_ID}}", cancel_url=f"{origin}/")
+    await tdb.payment_transactions.insert_one({"session_id": session.id, "booking_id": booking_id, "amount": float(b["balance_due"]), "kind": "balance",
+                                              "currency": "gbp", "status": "initiated", "payment_status": "pending", "created_at": now_iso(), "updated_at": now_iso()})
+    status = await log_comm(b["customer"]["email"], "email", "balance_request", f"Balance due - {b['service_name']} (ref {b.get('reference')})",
+                            f"Hi {b['customer']['name']}, thank you for choosing {company_name()}. The remaining balance of £{b['balance_due']:.2f} for your "
+                            f"{b['service_name']} on {fmt_date(b['date'])} is now due. Please use the secure Stripe button below to pay.",
+                            lead_id=b["lead_id"], link=("Pay balance securely", session.url))
+    await audit("booking.balance_link", b.get("reference") or booking_id)
+    return {"url": session.url, "email_status": status}
+
+
 @router.patch("/bookings/{booking_id}")
 async def patch_booking(booking_id: str, body: BookingPatch, ctx=Depends(require_admin)):
     b = await tdb.bookings.find_one({"_id": oid(booking_id)})
@@ -174,9 +198,11 @@ async def patch_booking(booking_id: str, body: BookingPatch, ctx=Depends(require
     if body.status == "completed":
         await tdb.leads.update_one({"_id": oid(b["lead_id"])}, {"$set": {"status": "completed"}})
         await add_event(b["lead_id"], "job", f"Job completed: {b['service_name']} {when}")
+        review = s["business"].get("review_link") or ""
         await log_comm(c["email"], "email", "feedback_review_request", "How did we do?",
-                       f"Hi {c['name']}, thank you for choosing {company_name()}. We'd value your honest feedback - "
-                       f"you can leave a review here: {s['business']['review_link']}. If anything wasn't right, just reply and we'll put it right.",
+                       f"Hi {c['name']}, thank you for choosing {company_name()}. We'd value your honest feedback"
+                       + (f" - you can leave a review here: {review}" if review.startswith("https://") else " - just reply to this email")
+                       + ". If anything wasn't right, just reply and we'll put it right.",
                        kind="follow_up", lead_id=b["lead_id"])
     elif body.status == "cancelled":
         await add_event(b["lead_id"], "job", f"Booking cancelled: {when}. Any refund must be approved and issued manually in Stripe.")

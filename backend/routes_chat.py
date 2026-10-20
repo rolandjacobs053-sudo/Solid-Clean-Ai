@@ -77,7 +77,7 @@ def _system(s: dict, conv: dict, policies: str = "") -> str:
 
 
 async def published_policies() -> str:
-    return "\n".join([f"- {x['title']}: {x['published_content'][:600]}" async for x in tdb.policies.find({"audience": "public", "published_version": {"$gt": 0}})])
+    return "\n".join([f"- {x['title']}: {x['published_content'][:4000]}" async for x in tdb.policies.find({"audience": "public", "published_version": {"$gt": 0}})])
 
 
 async def _conv(cid: str) -> dict:

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/admin/ui";
+import { PhotoGrid } from "@/components/admin/BookingDetail";
 import { api, errMsg, fmtDate, fmtDateTime, gbp, label } from "@/lib/api";
 
 export const LEAD_STATUSES = ["new", "quoted", "booked", "completed", "lost"];
@@ -63,6 +64,7 @@ export function LeadDrawer({ leadId, onClose, onSaved }) {
               {!d.bookings.length && <p className="text-sm text-slate-400">None</p>}
             </Section>
             {d.conversations.length > 0 && <Section title="AI receptionist summaries">{d.conversations.map((c) => <p key={c.id} className="rounded-lg bg-teal-50 p-3 text-sm text-teal-900">{c.summary || "No summary yet"}</p>)}</Section>}
+            {d.photos?.length > 0 && <Section title="Photos uploaded by the customer"><PhotoGrid photos={d.photos} /></Section>}
             <Section title="Timeline">
               <ol className="space-y-2 border-l border-slate-200 pl-4" data-testid="lead-drawer-timeline">
                 {[...(d.lead.timeline || [])].reverse().map((t, i) => <li key={i} className="text-sm"><span className="font-mono text-[10px] text-slate-400">{fmtDateTime(t.at)}</span><p>{t.text}</p></li>)}

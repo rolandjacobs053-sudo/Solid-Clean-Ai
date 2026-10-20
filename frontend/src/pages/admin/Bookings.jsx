@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DemoTag, Empty, PageHeader, StatusBadge, useLoad } from "@/components/admin/ui";
+import { BookingDetail } from "@/components/admin/BookingDetail";
 import { api, errMsg, fmtDate, gbp } from "@/lib/api";
 
 function Actions({ b, reload }) {
@@ -41,9 +42,10 @@ export default function Bookings() {
   const [status, setStatus] = useState("confirmed");
   const [rows, reload] = useLoad("/admin/bookings", { status: status === "all" ? "" : status });
   const [staff] = useLoad("/admin/staff");
+  const [open, setOpen] = useState(null);
   return (
     <div data-testid="admin-bookings-page">
-      <PageHeader eyebrow="Operations" title="Bookings & jobs" desc="Bookings are confirmed only after payment. Completing a job triggers a feedback and review request to every customer." />
+      <PageHeader eyebrow="Operations" title="Bookings & jobs" desc="Click a booking to see the customer, property, photos, extras, access and keys, and the terms they accepted." />
       <Tabs value={status} onValueChange={setStatus} className="mb-4">
         <TabsList className="flex-wrap">
           {[["confirmed", "Upcoming"], ["completed", "Completed"], ["pending_payment", "Awaiting payment"], ["cancelled", "Cancelled"], ["all", "All"]].map(([v, t]) => (
@@ -56,7 +58,7 @@ export default function Bookings() {
           <TableHeader><TableRow>{["When", "Customer", "Service", "Postcode", "Total", "Payment", "Status", "Assigned", ""].map((h) => <TableHead key={h}>{h}</TableHead>)}</TableRow></TableHeader>
           <TableBody>
             {rows?.map((b) => (
-              <TableRow key={b.id} data-testid="booking-row">
+              <TableRow key={b.id} data-testid="booking-row" className="cursor-pointer" onClick={(e) => { if (!e.target.closest("button,[role=combobox]")) setOpen(b); }}>
                 <TableCell className="whitespace-nowrap font-mono text-xs">{fmtDate(b.date)} · {b.slot}</TableCell>
                 <TableCell className="font-medium">{b.customer.name}<DemoTag show={b.demo} /><p className="text-xs font-normal text-slate-500">{b.customer.phone}</p></TableCell>
                 <TableCell className="text-sm">{b.service_name}{b.access_notes && <p className="text-xs text-slate-500">{b.access_notes}</p>}</TableCell>
@@ -65,13 +67,14 @@ export default function Bookings() {
                 <TableCell><StatusBadge status={b.payment_status} /></TableCell>
                 <TableCell><StatusBadge status={b.status} testid={`booking-status-${b.id}`} /></TableCell>
                 <TableCell><Assign b={b} staff={staff} reload={reload} /></TableCell>
-                <TableCell><Actions b={b} reload={reload} /></TableCell>
+                <TableCell><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setOpen(b)} data-testid={`booking-view-btn-${b.id}`}>View</Button><Actions b={b} reload={reload} /></div></TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
         {rows?.length === 0 && <Empty>No bookings here.</Empty>}
       </div>
+      <BookingDetail b={open} onClose={() => setOpen(null)} reload={reload} />
     </div>
   );
 }

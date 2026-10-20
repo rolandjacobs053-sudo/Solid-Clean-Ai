@@ -26,7 +26,7 @@ export function QuoteSummary({ preview, form, date, slot, config }) {
           {date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })} {slot ? `· ${slot}` : "· choose a time"}
         </p>
       )}
-      <p className="mt-5 text-xs text-slate-400">Calculated from Solid Clean's approved price list. Full payment secures your slot.</p>
+      <p className="mt-5 text-xs text-slate-400">Calculated from Solid Clean's approved price list. {config?.business?.payment_mode === "deposit_50" ? `A 50% deposit${preview?.deposit != null ? ` (${gbp(preview.deposit)})` : ""} confirms your booking; the balance is due after the clean.` : "Full payment secures your slot."}</p>
     </aside>
   );
 }

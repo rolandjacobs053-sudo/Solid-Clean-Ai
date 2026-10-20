@@ -1,21 +1,21 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
-import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { api, errMsg, gbp, getSource } from "@/lib/api";
 import { useTenant } from "@/lib/tenant";
-import { ChoiceCard, Counter } from "@/components/quote/Controls";
 import { QuoteSummary } from "@/components/quote/QuoteSummary";
-import { SlotPicker } from "@/components/quote/SlotPicker";
+import { PhotoUploader } from "@/components/quote/PhotoUploader";
+import { StepExtras, StepProperty, StepService } from "@/components/quote/BookingSteps";
+import { StepAccess, StepContact, StepReview, StepTerms, accessOk } from "@/components/quote/BookingSteps2";
 
-const STEPS = ["Property", "Rooms & extras", "Date & time", "Your details"];
-const INITIAL = { service: "regular", property_type: "flat", bedrooms: 2, bathrooms: 1, living_rooms: 1, condition: "good", extras: [], postcode: "", promo_code: "" };
+const STEPS = ["Service", "Property", "Photos", "Extras", "Access", "Date & details", "Terms", "Review"];
+const TITLES = ["Which cleaning service do you need?", "Tell us about the property", "", "Any additional services?", "How will we access the property?", "Choose a time & add your details", "Booking terms & policies", "Check your booking"];
+const INITIAL = { service: "regular", property_type: "flat", bedrooms: 2, bathrooms: 1, living_rooms: 1, condition: "good", extras: [], postcode: "", promo_code: "",
+  address: "", furnished: "", pets: "no", pet_hair_odour: false, additional_areas: [], flooring: "", property_notes: "" };
+const ACCESS0 = { method: "customer_present", person_name: "", person_phone: "", agency_name: "", agency_address: "", agency_instructions: "", notes: "" };
 
 export default function QuotePage() {
   const { base, pub } = useTenant();
@@ -28,7 +28,8 @@ export default function QuotePage() {
   const [date, setDate] = useState();
   const [slot, setSlot] = useState("");
   const [contact, setContact] = useState({ name: "", email: "", phone: "", marketing_consent: false });
-  const [notes, setNotes] = useState("");
+  const [access, setAccess] = useState(ACCESS0);
+  const [photos, setPhotos] = useState([]);
   const [busy, setBusy] = useState(false);
   const [accepted, setAccepted] = useState({});
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -36,7 +37,7 @@ export default function QuotePage() {
   useEffect(() => {
     api.get(`${pub}/config`).then((r) => setConfig(r.data));
     const q = params.get("q");
-    if (q) api.get(`${pub}/quotes/${q}`).then((r) => { setForm({ ...INITIAL, ...r.data.input }); setQuoteId(q); setStep(2); }).catch(() => {});
+    if (q) api.get(`${pub}/quotes/${q}`).then((r) => { setForm({ ...INITIAL, ...r.data.input }); setQuoteId(q); setStep(1); }).catch(() => {});
   }, [params, pub]);
 
   useEffect(() => {
@@ -45,145 +46,70 @@ export default function QuotePage() {
     return () => clearTimeout(t);
   }, [form, pub, date]);
 
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [step]);
+
   if (!config) return <div className="p-16 text-center font-mono text-sm text-slate-500">Loading price list…</div>;
   const p = { ...config.pricing, services: config.pricing.services.filter((s) => s.active !== false && s.online_booking !== false) };
-  const required = (config.policies || []).filter((x) => x.require_acceptance);
+  const svc = p.services.find((s) => s.key === form.service);
+  const policies = config.policies || [];
+  const required = policies.filter((x) => x.require_acceptance);
   const termsOk = required.every((x) => accepted[x.key]);
   const needsReview = preview?.status === "needs_review";
   const postcodeOk = /^[A-Za-z]{1,2}\d/.test(form.postcode.trim());
-  const canNext = [postcodeOk, true, needsReview || (date && slot), true][step];
   const contactOk = contact.name && /\S+@\S+\.\S+/.test(contact.email) && contact.phone.length >= 6;
+  const uploading = photos.some((x) => x.status === "uploading");
+  const canNext = [true, postcodeOk && form.address.trim().length >= 5, !uploading, true, accessOk(access), contactOk && (needsReview || (date && slot)), needsReview || termsOk, true][step];
+  const hints = ["", "Add the property address and a valid postcode", "Please wait for photos to finish uploading", "", "Please complete the access details", "Choose a date & time and add your name, email and phone", "Please read and accept the booking terms", ""];
+  const deposit = preview?.deposit ?? preview?.total;
+  const photoRefs = photos.filter((x) => x.status === "done").map(({ id, token }) => ({ id, token }));
 
   const submit = async (mode) => {
-    if (!contactOk) return toast.error("Please add your name, a valid email and phone number.");
-    if (mode === "book" && !termsOk) return toast.error("Please review and accept the booking terms.");
     setBusy(true);
     try {
       if (mode === "book") {
         const accepted_policies = Object.fromEntries(required.map((x) => [x.key, x.published_version]));
-        const { data } = await api.post(`${pub}/bookings`, { quote: form, contact, date: format(date, "yyyy-MM-dd"), slot, access_notes: notes, source: getSource(), quote_id: quoteId, accepted_policies, origin_url: `${window.location.origin}${base}` });
-        if (data.confirmed) {
-          toast.success(`Booking confirmed. ${data.payment_instructions || ""}`, { duration: 10000 });
-          setBusy(false);
-          setStep(0);
-          return;
-        }
+        const { data } = await api.post(`${pub}/bookings`, { quote: form, contact, date: format(date, "yyyy-MM-dd"), slot, access, photos: photoRefs, source: getSource(), quote_id: quoteId, accepted_policies, origin_url: `${window.location.origin}${base}` });
+        if (data.confirmed) { toast.success(`Booking confirmed. ${data.payment_instructions || ""}`, { duration: 10000 }); setBusy(false); setStep(0); return; }
         window.location.href = data.checkout_url;
         return;
       }
-      await api.post(`${pub}/quotes`, { quote: form, contact, source: getSource() });
-      toast.success(needsReview ? "Thanks - our team will review and contact you shortly." : "Quote sent to your email.");
+      await api.post(`${pub}/quotes`, { quote: form, contact, photos: photoRefs, source: getSource() });
+      toast.success(needsReview ? "Thanks - our team will review your details and contact you shortly." : "Quote sent to your email.");
     } catch (e) { toast.error(errMsg(e)); }
     setBusy(false);
   };
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8" data-testid="quote-page">
-      <p className="eyebrow">Instant quote &amp; booking</p>
-      <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">Your clean, priced precisely.</h1>
-      <ol className="mt-8 flex flex-wrap gap-2" data-testid="quote-stepper">
+    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8" data-testid="quote-page">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div><p className="eyebrow">Book online</p><h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">{TITLES[step] || "Upload Photos of Your Property"}</h1></div>
+        {config.business.phone && <a href={`tel:${config.business.phone.replace(/\s/g, "")}`} className="flex items-center gap-2 text-sm font-semibold text-[#023F00]" data-testid="quote-call-link"><Phone className="h-4 w-4" />Prefer to book by phone? {config.business.phone}</a>}
+      </div>
+      <ol className="mt-6 flex gap-1.5 overflow-x-auto pb-1" data-testid="quote-stepper">
         {STEPS.map((s, i) => (
-          <li key={s} className={`rounded-full px-4 py-1.5 font-mono text-xs ${i === step ? "bg-slate-900 text-white" : i < step ? "bg-teal-100 text-teal-800" : "bg-slate-100 text-slate-500"}`}>0{i + 1} {s}</li>
+          <li key={s} className={`whitespace-nowrap rounded-full px-3 py-1.5 font-mono text-[11px] ${i === step ? "bg-[#023F00] text-white" : i < step ? "bg-[#8F7E22]/15 text-[#023F00]" : "bg-slate-100 text-slate-500"}`} data-testid={`quote-step-${i + 1}`}>{i + 1}. {s}</li>
         ))}
       </ol>
-      <div className="mt-10 grid gap-10 lg:grid-cols-12">
+      <div className="mt-8 grid gap-10 lg:grid-cols-12">
         <section className="space-y-8 lg:col-span-7">
-          {step === 0 && (
-            <>
-              <div>
-                <Label className="eyebrow">Service</Label>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2" data-testid="quote-service-options">
-                  {p.services.map((s) => <ChoiceCard key={s.key} active={form.service === s.key} onClick={() => set("service", s.key)} title={s.name} sub={s.requires_survey ? "Priced after a short survey" : `From ${gbp(s.min_price)}`} testid={`quote-service-${s.key}`} />)}
-                </div>
-              </div>
-              <div>
-                <Label className="eyebrow">Property type</Label>
-                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="quote-property-type-select">
-                  {p.property_types.map((t) => <ChoiceCard key={t.key} active={form.property_type === t.key} onClick={() => set("property_type", t.key)} title={t.name} testid={`quote-ptype-${t.key}`} />)}
-                </div>
-              </div>
-              <div className="max-w-xs">
-                <Label htmlFor="pc" className="eyebrow">Property postcode</Label>
-                <Input id="pc" value={form.postcode} onChange={(e) => set("postcode", e.target.value.toUpperCase())} placeholder="e.g. SW19 2AB" className="mt-3 h-12 rounded-xl font-mono" data-testid="quote-postcode-input" />
-              </div>
-            </>
-          )}
-          {step === 1 && (
-            <>
-              <div className="grid gap-3">
-                <Counter label="Bedrooms" value={form.bedrooms} onChange={(v) => set("bedrooms", v)} max={12} testid="quote-bedrooms-count" />
-                <Counter label="Bathrooms" value={form.bathrooms} onChange={(v) => set("bathrooms", v)} testid="quote-bathrooms-count" />
-                <Counter label="Living rooms" value={form.living_rooms} onChange={(v) => set("living_rooms", v)} max={6} testid="quote-living-count" />
-              </div>
-              <div>
-                <Label className="eyebrow">Condition</Label>
-                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {p.conditions.map((c) => <ChoiceCard key={c.key} active={form.condition === c.key} onClick={() => set("condition", c.key)} title={c.name} testid={`quote-condition-${c.key}`} />)}
-                </div>
-              </div>
-              <div>
-                <Label className="eyebrow">Extras</Label>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  {p.extras.map((x) => (
-                    <label key={x.key} className="flex cursor-pointer items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm hover:border-teal-300">
-                      <span className="flex items-center gap-3">
-                        <Checkbox checked={form.extras.includes(x.key)} data-testid={`quote-extra-${x.key}`}
-                          onCheckedChange={(c) => set("extras", c ? [...form.extras, x.key] : form.extras.filter((k) => k !== x.key))} />{x.name}
-                      </span>
-                      <span className="font-mono text-xs text-slate-500">+{gbp(x.price)}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-          {step === 2 && (needsReview
-            ? <div className="rounded-2xl bg-amber-50 p-6 text-sm text-amber-900" data-testid="quote-needs-review">This request needs a quick review by our team before we can fix a price or a time. Continue to leave your details and we'll call you.</div>
-            : <SlotPicker availability={config.availability} date={date} setDate={setDate} slot={slot} setSlot={setSlot} />)}
-          {step === 3 && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[["name", "Full name", "text"], ["phone", "Phone", "tel"], ["email", "Email", "email"]].map(([k, l, t]) => (
-                <div key={k} className={k === "email" ? "sm:col-span-2" : ""}>
-                  <Label htmlFor={k}>{l}</Label>
-                  <Input id={k} type={t} value={contact[k]} onChange={(e) => setContact({ ...contact, [k]: e.target.value })} className="mt-2 h-11 rounded-xl" data-testid={`quote-contact-${k}-input`} />
-                </div>
-              ))}
-              <div className="sm:col-span-2">
-                <Label htmlFor="notes">Access, keys, pets or special requests</Label>
-                <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-2 rounded-xl" data-testid="quote-access-notes-input" />
-              </div>
-              <label className="flex items-start gap-3 text-sm text-slate-600 sm:col-span-2">
-                <Checkbox checked={contact.marketing_consent} onCheckedChange={(c) => setContact({ ...contact, marketing_consent: !!c })} data-testid="quote-marketing-consent-checkbox" />
-                I'd like occasional offers and cleaning tips by email. (Optional - you can unsubscribe at any time.)
-              </label>
-              <div className="sm:col-span-2">
-                <Label htmlFor="promo">Promo code (optional)</Label>
-                <Input id="promo" value={form.promo_code} onChange={(e) => set("promo_code", e.target.value.toUpperCase())} className="mt-2 h-11 max-w-xs rounded-xl font-mono" data-testid="quote-promo-input" />
-                {preview?.promo_error && form.promo_code && <p className="mt-1 text-xs text-red-600" data-testid="quote-promo-error">{preview.promo_error}</p>}
-              </div>
-              {!needsReview && required.map((x) => (
-                <label key={x.key} className="flex items-start gap-3 text-sm text-slate-700 sm:col-span-2">
-                  <Checkbox checked={!!accepted[x.key]} onCheckedChange={(c) => setAccepted({ ...accepted, [x.key]: !!c })} data-testid={`quote-accept-${x.key}`} />
-                  <span>I have read and accept the <a href={`${base}/policies#${x.key}`} target="_blank" rel="noreferrer" className="font-medium text-teal-700 underline">{x.title}</a> (version {x.published_version}).</span>
-                </label>
-              ))}
-              <p className="text-xs text-slate-500 sm:col-span-2">All policies: <a href={`${base}/policies`} target="_blank" rel="noreferrer" className="underline" data-testid="quote-policies-link">view company policies</a></p>
-            </div>
-          )}
+          {step === 0 && <StepService services={p.services} form={form} set={(k, v) => setForm((f) => ({ ...f, [k]: v, extras: [] }))} />}
+          {step === 1 && <StepProperty p={p} form={form} set={set} postcodeOk={postcodeOk} />}
+          {step === 2 && <PhotoUploader pub={pub} photos={photos} setPhotos={setPhotos} />}
+          {step === 3 && <StepExtras p={p} svc={svc} form={form} set={set} />}
+          {step === 4 && <StepAccess access={access} setAccess={setAccess} />}
+          {step === 5 && <StepContact config={config} needsReview={needsReview} date={date} setDate={setDate} slot={slot} setSlot={setSlot} contact={contact} setContact={setContact} form={form} set={set} preview={preview} />}
+          {step === 6 && <StepTerms policies={policies} base={base} accepted={accepted} setAccepted={setAccepted} needsReview={needsReview} />}
+          {step === 7 && <StepReview p={p} svc={svc} form={form} access={access} photos={photos} date={date} slot={slot} contact={contact} preview={preview} policies={policies} needsReview={needsReview} deposit={deposit} />}
           <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-6">
             {step > 0 && <Button variant="ghost" onClick={() => setStep(step - 1)} data-testid="quote-back-btn"><ArrowLeft className="mr-1 h-4 w-4" />Back</Button>}
-            {step < 3 && <Button disabled={!canNext} onClick={() => setStep(step + 1)} className="rounded-full bg-slate-900 px-7 hover:bg-teal-700 hover:text-white" data-testid="quote-next-btn">Continue<ArrowRight className="ml-1 h-4 w-4" /></Button>}
-            {step === 3 && !needsReview && (
-              <Button disabled={busy || !termsOk} onClick={() => submit("book")} className="rounded-full bg-teal-600 px-7 hover:bg-teal-700 hover:text-white" data-testid="quote-book-now-btn">
-                {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Pay {gbp(preview?.total)} &amp; confirm
+            {step < 7 && <Button disabled={!canNext} onClick={() => setStep(step + 1)} className="rounded-full bg-[#023F00] px-7 text-white hover:bg-[#8F7E22]" data-testid="quote-next-btn">{step === 2 && !photos.length ? "Skip photos" : "Continue"}<ArrowRight className="ml-1 h-4 w-4" /></Button>}
+            {step === 7 && !needsReview && (
+              <Button disabled={busy || !termsOk} onClick={() => submit("book")} className="rounded-full bg-[#023F00] px-7 text-white hover:bg-[#8F7E22]" data-testid="quote-book-now-btn">
+                {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{deposit < preview?.total ? `Pay ${gbp(deposit)} deposit & confirm` : `Pay ${gbp(preview?.total)} & confirm`}
               </Button>
             )}
-            {step === 3 && (
-              <Button variant="outline" disabled={busy} onClick={() => submit("quote")} className="rounded-full" data-testid="quote-email-quote-btn">
-                {needsReview ? "Send enquiry" : "Just email me this quote"}
-              </Button>
-            )}
-            {step === 0 && !postcodeOk && <span className="text-xs text-slate-500">Enter a valid postcode to continue</span>}
+            {step === 7 && <Button variant="outline" disabled={busy || !contactOk} onClick={() => submit("quote")} className="rounded-full" data-testid="quote-email-quote-btn">{needsReview ? "Send enquiry" : "Just email me this quote"}</Button>}
+            {!canNext && hints[step] && <span className="text-xs text-slate-500" data-testid="quote-step-hint">{hints[step]}</span>}
           </div>
         </section>
         <div className="lg:col-span-5"><QuoteSummary preview={preview} form={form} date={!needsReview && date} slot={slot} config={config} /></div>

@@ -23,7 +23,7 @@ export default function PaymentResult() {
     const poll = async () => {
       try {
         const { data } = await api.get(`/payments/status/${sid}`);
-        if (data.payment_status === "paid") return setState({ status: "paid", booking: data.booking });
+        if (data.payment_status === "paid") return setState({ status: "paid", booking: data.booking, amount: data.amount, kind: data.kind });
       } catch { /* retry */ }
       if (++tries < 10) setTimeout(poll, 2000);
       else setState({ status: "pending" });
@@ -31,16 +31,17 @@ export default function PaymentResult() {
     poll();
   }, [result, params, pub]);
 
-  const { status, booking } = state;
+  const { status, booking, amount, kind } = state;
   return (
     <main className="mx-auto max-w-xl px-4 py-24 text-center" data-testid="payment-result-page">
       {status === "checking" && <><Loader2 className="mx-auto h-10 w-10 animate-spin text-teal-600" /><p className="mt-4 text-slate-600" data-testid="payment-status-checking">Confirming your payment…</p></>}
       {status === "paid" && (
         <div data-testid="payment-status-paid">
           <CheckCircle2 className="mx-auto h-14 w-14 text-teal-600" />
-          <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-slate-900">Booking confirmed</h1>
+          <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-slate-900">{kind === "balance" ? "Balance paid - thank you" : "Booking confirmed"}</h1>
           <p className="mt-4 text-slate-600">{booking.service_name} on <b>{fmtDate(booking.date)}</b> at <b>{booking.slot}</b>.</p>
-          <p className="mt-2 font-mono text-2xl font-bold text-teal-700">{gbp(booking.total)} paid</p>
+          <p className="mt-2 font-mono text-2xl font-bold text-teal-700">{gbp(amount ?? booking.total)} {kind === "deposit" ? "deposit paid" : "paid"}</p>
+          {kind === "deposit" && <p className="mt-2 text-sm text-slate-600">The remaining {gbp(booking.total - amount)} is due immediately after the clean.</p>}
           <p className="mt-4 text-sm text-slate-500">A confirmation is on its way, and we'll send a reminder the day before.</p>
         </div>
       )}

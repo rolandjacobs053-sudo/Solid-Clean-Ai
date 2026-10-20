@@ -3,7 +3,7 @@ import logging
 import secrets
 import os
 from datetime import timedelta, date
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from comms import add_event, booking_link, log_comm, quote_email, upsert_lead
 from core import access_state, company_name, current_company, db, get_settings, now, now_iso, oid, out, plan_features, set_tenant, tdb
 from pricing import compute_quote, fmt_date, slots_for
+from storage import attach_photos
 
 
 async def tenant_from_slug(slug: str):
@@ -44,6 +45,32 @@ class QuoteIn(BaseModel):
     postcode: str = ""
     date: str = ""
     promo_code: str = ""
+    address: str = Field("", max_length=200)
+    furnished: str = Field("", max_length=30)
+    pets: str = Field("", max_length=30)
+    pet_hair_odour: bool = False
+    additional_areas: List[str] = Field([], max_length=10)
+    flooring: str = Field("", max_length=30)
+    property_notes: str = Field("", max_length=1000)
+
+
+class PhotoRef(BaseModel):
+    id: str
+    token: str
+
+
+class AccessIn(BaseModel):
+    method: Literal["customer_present", "authorised_person", "estate_agency", "other"] = "customer_present"
+    person_name: str = Field("", max_length=120)
+    person_phone: str = Field("", max_length=30)
+    agency_name: str = Field("", max_length=120)
+    agency_address: str = Field("", max_length=250)
+    agency_instructions: str = Field("", max_length=1000)
+    notes: str = Field("", max_length=1000)
+
+
+ACCESS_LABELS = {"customer_present": "Customer will be present", "authorised_person": "Authorised person will give access",
+                 "estate_agency": "Keys collected from estate agency", "other": "Other arrangement"}
 
 
 class Contact(BaseModel):
@@ -57,12 +84,14 @@ class QuoteSave(BaseModel):
     quote: QuoteIn
     contact: Contact
     source: str = "website"
+    photos: List[PhotoRef] = Field([], max_length=10)
 
 
 class BookingIn(QuoteSave):
     date: str
     slot: str
     access_notes: str = ""
+    access: AccessIn = AccessIn()
     accepted_policies: dict = {}
     quote_id: Optional[str] = None
     origin_url: str
@@ -87,6 +116,21 @@ async def notify_owner(settings: dict, subject: str, body: str, lead_id=None):
     await log_comm(settings["business"]["owner_notify_email"], "email", "owner_notification", subject, body, lead_id=lead_id)
 
 
+def deposit_for(settings: dict, total: float) -> float:
+    return round(total * 0.5, 2) if settings["business"].get("payment_mode") == "deposit_50" else total
+
+
+def access_text(a: dict) -> str:
+    parts = [ACCESS_LABELS.get(a.get("method"), "-")]
+    if a.get("method") == "authorised_person":
+        parts.append(f"{a.get('person_name')} {a.get('person_phone')}")
+    if a.get("method") == "estate_agency":
+        parts.append(f"{a.get('agency_name')}, {a.get('agency_address')}. {a.get('agency_instructions') or ''}")
+    if a.get("notes"):
+        parts.append(a["notes"])
+    return " - ".join(p.strip() for p in parts if p.strip())
+
+
 @router.get("/")
 async def root():
     return {"service": "Solid Clean OS", "ok": True}
@@ -101,7 +145,7 @@ async def public_config(slug: str):
             "ai_receptionist": company.get("comped") or "ai_receptionist" in feats,
             "policies": [{k: p.get(k) for k in ("key", "title", "published_version", "published_content", "effective_date", "require_acceptance")}
                          async for p in tdb.policies.find({"audience": "public", "published_version": {"$gt": 0}}).sort("order", 1)],
-            "business": {k: s["business"].get(k) for k in ("name", "website", "online_payments", "phone", "logo_url", "brand_primary", "brand_accent", "about_text", "contact_email", "service_areas_text", "business_hours")}}
+            "business": {k: s["business"].get(k) for k in ("name", "website", "online_payments", "phone", "logo_url", "brand_primary", "brand_accent", "about_text", "contact_email", "service_areas_text", "business_hours", "payment_mode")}}
 
 
 class ContactIn(BaseModel):
@@ -129,7 +173,11 @@ async def public_reviews():
 
 @public.post("/quote/preview")
 async def quote_preview(q: QuoteIn):
-    return compute_quote((await get_settings())["pricing"], q.model_dump())
+    s = await get_settings()
+    result = compute_quote(s["pricing"], q.model_dump())
+    if result.get("total") is not None:
+        result["deposit"] = deposit_for(s, result["total"])
+    return result
 
 
 @public.get("/availability")
@@ -150,6 +198,7 @@ async def save_quote(body: QuoteSave, request: Request):
                                 {"marketing_consent": body.contact.marketing_consent})
     await tdb.leads.update_one({"_id": oid(lead_id), "status": "new"}, {"$set": {"status": "quoted"}})
     quote_id = await store_quote(q, result, lead_id, src)
+    await attach_photos(body.photos, lead_id=lead_id, quote_id=quote_id)
     if result["status"] == "ok":
         await log_comm(body.contact.email, "email", "quote_sent", f"Your {company_name()} quote - £{result['total']:.2f}",
                        quote_email(body.contact.name, result), lead_id=lead_id, link=booking_link(request, current_company.get()["slug"], quote_id))
@@ -165,7 +214,8 @@ async def get_quote(quote_id: str):
     q = await tdb.quotes.find_one({"_id": oid(quote_id)})
     if not q:
         raise HTTPException(404, "Quote not found")
-    return {"id": quote_id, "input": q["input"], "result": q["result"]}
+    inp = {k: v for k, v in q["input"].items() if k != "address"}
+    return {"id": quote_id, "input": inp, "result": q["result"]}
 
 
 @public.post("/bookings")
@@ -178,6 +228,13 @@ async def create_booking(body: BookingIn):
         raise HTTPException(409, "Please review and accept the current booking terms and policies.")
     if result["status"] != "ok":
         raise HTTPException(422, "This booking needs a quick review by our team: " + " ".join(result["reasons"]))
+    if len(q["address"].strip()) < 5:
+        raise HTTPException(422, "Please enter the property address.")
+    a = body.access
+    if a.method == "estate_agency" and not (a.agency_name.strip() and a.agency_address.strip()):
+        raise HTTPException(422, "Please add the estate agency name and address for key collection.")
+    if a.method == "authorised_person" and not (a.person_name.strip() and a.person_phone.strip()):
+        raise HTTPException(422, "Please add the name and phone number of the person giving access.")
     if body.slot not in [x["slot"] for x in await slots_for(s["availability"], body.date)]:
         raise HTTPException(409, "Sorry, that slot is no longer available. Please choose another time.")
     contact = body.contact.model_dump()
@@ -190,28 +247,32 @@ async def create_booking(body: BookingIn):
         await tdb.quotes.update_one({"_id": oid(quote_id)}, {"$set": {"lead_id": lead_id, "input": q, "result": result, "total": result["total"]}})
     else:
         quote_id = await store_quote(q, result, lead_id, lead["source"])
+    charge = deposit_for(s, result["total"])
     booking = {"lead_id": lead_id, "quote_id": quote_id, "customer": {k: contact[k] for k in ("name", "email", "phone")},
-               "postcode": q["postcode"].upper(), "service": q["service"], "service_name": result["service_name"], "input": q,
-               "total": result["total"], "date": body.date, "slot": body.slot, "access_notes": body.access_notes,
+               "postcode": q["postcode"].upper(), "address": q["address"].strip(), "service": q["service"], "service_name": result["service_name"], "input": q,
+               "lines": result["lines"], "total": result["total"], "deposit_amount": charge, "balance_due": round(result["total"] - charge, 2),
+               "payment_mode": s["business"].get("payment_mode", "full_upfront"), "date": body.date, "slot": body.slot,
+               "access": a.model_dump(), "access_notes": body.access_notes or access_text(a.model_dump()),
                "status": "pending_payment", "payment_status": "pending", "source": lead["source"], "accepted_policies": required,
                "reference": f"{current_company.get()['slug'][:2].upper()}-{now().strftime('%y%m')}-{secrets.token_hex(3).upper()}", "promo_code": result.get("promo_applied"),
                "hold_expires_at": (now() + timedelta(minutes=30)).isoformat(), "created_at": now_iso()}
     booking_id = str((await tdb.bookings.insert_one(booking)).inserted_id)
+    await attach_photos(body.photos, booking_id=booking_id, lead_id=lead_id, quote_id=quote_id)
     if not s["business"].get("online_payments", True):
         await finalize_booking(booking_id, paid=False)
         return {"confirmed": True, "booking_id": booking_id, "payment_instructions": s["business"].get("payment_instructions", "")}
     origin = body.origin_url.rstrip("/")
     kwargs = dict(
         mode="payment", customer_email=body.contact.email, metadata={"booking_id": booking_id},
-        line_items=[{"quantity": 1, "price_data": {"currency": "gbp", "unit_amount": int(round(result["total"] * 100)), "tax_behavior": "inclusive",
-                     "product_data": {"name": f"{result['service_name']} - {fmt_date(body.date)} {body.slot}"}}}],
+        line_items=[{"quantity": 1, "price_data": {"currency": "gbp", "unit_amount": int(round(charge * 100)), "tax_behavior": "inclusive",
+                     "product_data": {"name": ("50% deposit - " if charge < result["total"] else "") + f"{result['service_name']} - {fmt_date(body.date)} {body.slot}"}}}],
         success_url=f"{origin}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{origin}/payment/cancel?booking_id={booking_id}")
     try:
         session = stripe.checkout.Session.create(**kwargs, automatic_tax={"enabled": True}, billing_address_collection="required")
     except stripe.error.StripeError:
         session = stripe.checkout.Session.create(**kwargs)
-    await tdb.payment_transactions.insert_one({"session_id": session.id, "booking_id": booking_id, "amount": float(result["total"]),
+    await tdb.payment_transactions.insert_one({"session_id": session.id, "booking_id": booking_id, "amount": float(charge), "kind": "deposit" if charge < result["total"] else "booking",
                                               "currency": "gbp", "status": "initiated", "payment_status": "pending",
                                               "created_at": now_iso(), "updated_at": now_iso()})
     await tdb.bookings.update_one({"_id": oid(booking_id)}, {"$set": {"session_id": session.id}})
@@ -225,8 +286,10 @@ async def release_booking(booking_id: str):
 
 
 async def finalize_booking(booking_id: str, paid: bool = True):
+    pending = await tdb.bookings.find_one({"_id": oid(booking_id)}, {"balance_due": 1})
+    deposit = paid and (pending or {}).get("balance_due", 0) > 0
     res = await tdb.bookings.update_one({"_id": oid(booking_id), "status": "pending_payment"},
-                                       {"$set": {"status": "confirmed", "payment_status": "paid" if paid else "due", "paid_at": now_iso() if paid else None}})
+                                       {"$set": {"status": "confirmed", "payment_status": ("deposit_paid" if deposit else "paid") if paid else "due", "paid_at": now_iso() if paid else None}})
     if not res.modified_count:
         return
     b = await tdb.bookings.find_one({"_id": oid(booking_id)})
@@ -235,16 +298,17 @@ async def finalize_booking(booking_id: str, paid: bool = True):
     c = b["customer"]
     if b.get("promo_code"):
         await tdb.settings.update_one({"pricing.promo_codes.code": b["promo_code"]}, {"$inc": {"pricing.promo_codes.$.uses": 1}})
-    pay_text = f"Payment of £{b['total']:.2f} received." if paid else f"Amount due: £{b['total']:.2f}. {s['business'].get('payment_instructions', '')}"
+    pay_text = (f"Deposit of £{b['deposit_amount']:.2f} received. The remaining balance of £{b['balance_due']:.2f} is due immediately after the clean." if deposit
+                else f"Payment of £{b['total']:.2f} received." if paid else f"Amount due: £{b['total']:.2f}. {s['business'].get('payment_instructions', '')}")
     await tdb.leads.update_one({"_id": oid(b["lead_id"])}, {"$set": {"status": "booked"}})
     await tdb.quotes.update_one({"_id": oid(b["quote_id"])}, {"$set": {"status": "accepted"}})
-    await add_event(b["lead_id"], "booking", f"Booking confirmed & paid: {b['service_name']} {when} (£{b['total']:.2f})")
+    await add_event(b["lead_id"], "booking", f"Booking confirmed ({'deposit paid' if deposit else 'paid'}): {b['service_name']} {when} (£{b['total']:.2f})")
     await log_comm(c["email"], "email", "booking_confirmation", f"Booking confirmed - {when}",
-                   f"Hi {c['name']}, your {b['service_name']} is confirmed for {when} at {b['postcode']}. {pay_text} "
-                   "To reschedule or cancel, please contact us at least 24 hours in advance.", lead_id=b["lead_id"])
+                   f"Hi {c['name']}, your {b['service_name']} is confirmed for {when} at {b.get('address') or ''} {b['postcode']}. {pay_text} "
+                   "To reschedule, please give us at least 48 hours' notice. Our company policy applies to this booking.", lead_id=b["lead_id"])
     await log_comm(c["phone"], "sms", "booking_confirmation", "Booking confirmed",
                    f"{company_name()}: your clean is confirmed for {when}. Reply or call us to make changes.", lead_id=b["lead_id"])
-    await notify_owner(s, f"New paid booking - {when}", f"{c['name']} {c['phone']} - {b['service_name']} at {b['postcode']}, £{b['total']:.2f}. Notes: {b.get('access_notes') or '-'}", b["lead_id"])
+    await notify_owner(s, f"New booking - {when}", f"{c['name']} {c['phone']} - {b['service_name']} at {b.get('address') or ''} {b['postcode']}, total £{b['total']:.2f}. {pay_text} Access: {b.get('access_notes') or '-'}", b["lead_id"])
     remind_at = (date.fromisoformat(b["date"]) - timedelta(days=1)).isoformat() + "T17:00:00+00:00"
     await log_comm(c["phone"], "sms", "appointment_reminder", "Reminder",
                    f"Reminder: {company_name()} is booked for {when}. Please ensure access as discussed.", lead_id=b["lead_id"], scheduled_for=remind_at)
@@ -252,6 +316,14 @@ async def finalize_booking(booking_id: str, paid: bool = True):
                    f"Hi {c['name']}, a quick reminder that your {b['service_name']} with {company_name()} is booked for {when} at {b['postcode']}. "
                    "Please make sure we can access the property as discussed. To make changes, reply to this email or call us.",
                    lead_id=b["lead_id"], scheduled_for=remind_at)
+
+
+async def settle_balance(tx: dict):
+    res = await tdb.bookings.update_one({"_id": oid(tx["booking_id"]), "payment_status": "deposit_paid"},
+                                       {"$set": {"payment_status": "paid", "balance_due": 0, "balance_paid_at": now_iso()}})
+    if res.modified_count:
+        b = await tdb.bookings.find_one({"_id": oid(tx["booking_id"])})
+        await add_event(b["lead_id"], "payment", f"Balance of £{tx['amount']:.2f} paid for booking {b.get('reference')}")
 
 
 @router.get("/payments/status/{session_id}")
@@ -270,9 +342,9 @@ async def payment_status(session_id: str):
         except stripe.error.StripeError:
             pass
     if tx["payment_status"] == "paid":
-        await finalize_booking(tx["booking_id"])
+        await (settle_balance(tx) if tx.get("kind") == "balance" else finalize_booking(tx["booking_id"]))
     b = await tdb.bookings.find_one({"_id": oid(tx["booking_id"])})
-    return {"session_id": session_id, "status": tx["status"], "payment_status": tx["payment_status"],
+    return {"session_id": session_id, "status": tx["status"], "payment_status": tx["payment_status"], "kind": tx.get("kind", "booking"), "amount": tx["amount"],
             "booking": {"service_name": b["service_name"], "date": b["date"], "slot": b["slot"], "total": b["total"], "reference": b.get("reference")}}
 
 
@@ -293,7 +365,8 @@ async def stripe_webhook(request: Request):
     if kind == "checkout.session.completed" and obj.get("payment_status") == "paid":
         await tdb.payment_transactions.update_one({"session_id": obj["id"], "payment_status": {"$ne": "paid"}},
                                                  {"$set": {"status": "completed", "payment_status": "paid", "updated_at": now_iso()}})
-        await finalize_booking(obj["metadata"]["booking_id"])
+        tx = await tdb.payment_transactions.find_one({"session_id": obj["id"]})
+        await (settle_balance(tx) if tx.get("kind") == "balance" else finalize_booking(obj["metadata"]["booking_id"]))
     elif kind == "checkout.session.expired":
         await tdb.payment_transactions.update_one({"session_id": obj["id"]}, {"$set": {"status": "expired", "payment_status": "expired"}})
         await tdb.bookings.update_one({"session_id": obj["id"], "status": "pending_payment"}, {"$set": {"status": "abandoned"}})

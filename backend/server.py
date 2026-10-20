@@ -23,6 +23,8 @@ import routes_public
 import routes_saas
 import routes_tools
 import routes_voice
+import routes_photos
+import storage
 from automations import run_all_companies
 from core import client
 from seed import seed_all
@@ -32,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="CleanOps")
 for r in (routes_auth.router, routes_saas.router, routes_saas.platform, routes_public.router, routes_public.public, routes_chat.router,
-          routes_admin.router, routes_growth.router, routes_growth.outreach, routes_growth.reviews_r, routes_tools.router, routes_policies.router, routes_voice.router, routes_voice.admin):
+          routes_admin.router, routes_growth.router, routes_growth.outreach, routes_growth.reviews_r, routes_tools.router, routes_policies.router, routes_voice.router, routes_voice.admin, routes_photos.public, routes_photos.admin):
     app.include_router(r)
 
 HITS = defaultdict(deque)
@@ -74,6 +76,10 @@ async def automation_loop():
 @app.on_event("startup")
 async def startup():
     await seed_all()
+    try:
+        await asyncio.to_thread(storage.init_storage)
+    except Exception:
+        logger.exception("Storage init failed")
     asyncio.create_task(routes_saas.seed_plans())
     asyncio.create_task(automation_loop())
 

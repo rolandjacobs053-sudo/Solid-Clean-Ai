@@ -43,7 +43,10 @@ DEFAULT_SETTINGS = {
         "extras": [
             {"key": "oven", "name": "Single oven deep clean", "price": 45},
             {"key": "double_oven", "name": "Double oven deep clean", "price": 65},
-            {"key": "fridge", "name": "Fridge / freezer", "price": 25},
+            {"key": "fridge", "name": "Fridge/freezer cleaning", "price": 25, "description": "Inside and outside clean of your fridge/freezer. No defrosting."},
+            {"key": "freezer_defrost", "name": "Freezer defrost", "price": 75, "excludes": ["fridge"],
+             "description": "For iced-up freezers: we defrost the freezer, then clean the fridge/freezer inside and out. Includes fridge/freezer cleaning, so you don't need both."},
+            {"key": "hob", "name": "Hob cleaning", "price": 25},
             {"key": "dishwasher", "name": "Dishwasher clean", "price": 20},
             {"key": "blinds", "name": "Blinds cleaning", "price": 20},
             {"key": "windows", "name": "Interior windows", "price": 30},
@@ -113,9 +116,11 @@ def compute_quote(pricing: dict, q: dict, public: bool = True) -> dict:
     else:
         lines = [{"label": svc["name"] + (" (starting price)" if svc["pricing_mode"] == "from" else ""), "amount": svc["fixed_price"]}]
     allowed = svc["extras"] or [e["key"] for e in pricing["extras"]]
-    for key in q.get("extras") or []:
-        extra = _find(pricing["extras"], key)
-        if extra and key in allowed:
+    chosen = [k for k in dict.fromkeys(q.get("extras") or []) if k in allowed and _find(pricing["extras"], k)]
+    excluded = {x for k in chosen for x in _find(pricing["extras"], k).get("excludes", [])}
+    for key in chosen:
+        if key not in excluded:
+            extra = _find(pricing["extras"], key)
             lines.append({"label": extra["name"], "amount": extra["price"]})
     total = round(sum(line["amount"] for line in lines), 2)
     if total < svc["min_price"]:
