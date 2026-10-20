@@ -1,5 +1,4 @@
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ChoiceCard, Counter } from "@/components/quote/Controls";
@@ -25,7 +24,7 @@ export function Pills({ options, value, onChange, testid }) {
 export function StepService({ services, form, set }) {
   return (
     <>
-    {form.service === "commercial" && <a href="/commercial-cleaning" className="block rounded-2xl border-2 border-[#8F7E22] bg-[#fbf9f1] p-4 text-sm font-semibold text-[#023F00]" data-testid="quote-commercial-walkthrough-link">Commercial premises are priced after a free, no-obligation site walkthrough. Book a free site walkthrough →</a>}
+    {form.service === "commercial" && <a href="/commercial-cleaning/request" className="block rounded-2xl border-2 border-[#8F7E22] bg-[#fbf9f1] p-4 text-sm font-semibold text-[#023F00]" data-testid="quote-commercial-walkthrough-link">Commercial premises are priced after a free, no-obligation site walkthrough. Book a free site walkthrough →</a>}
     <div className="grid gap-3 sm:grid-cols-2" data-testid="quote-service-options">
       {services.map((s) => <ChoiceCard key={s.key} active={form.service === s.key} onClick={() => set("service", s.key)} title={s.name}
         sub={s.requires_survey ? "Priced after a short survey" : `From ${gbp(s.min_price)}${isEot(s.key) ? " · move-out clean" : s.key === "regular" ? " · routine home clean" : ""}`} testid={`quote-service-${s.key}`} />)}
@@ -36,7 +35,7 @@ export function StepService({ services, form, set }) {
 
 const Block = ({ label, children }) => <div><Label className="eyebrow">{label}</Label>{children}</div>;
 
-export function StepProperty({ p, form, set, postcodeOk }) {
+export function StepProperty({ p, form, set }) {
   const eot = isEot(form.service);
   const toggleArea = (a) => set("additional_areas", form.additional_areas.includes(a) ? form.additional_areas.filter((x) => x !== a) : [...form.additional_areas, a]);
   return (
@@ -50,11 +49,6 @@ export function StepProperty({ p, form, set, postcodeOk }) {
         <Counter label="Bedrooms" value={form.bedrooms} onChange={(v) => set("bedrooms", v)} max={12} testid="quote-bedrooms-count" />
         <Counter label="Bathrooms" value={form.bathrooms} onChange={(v) => set("bathrooms", v)} testid="quote-bathrooms-count" />
         <Counter label="Living rooms" value={form.living_rooms} onChange={(v) => set("living_rooms", v)} max={6} testid="quote-living-count" />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="sm:col-span-2"><Label htmlFor="addr" className="eyebrow">Property address</Label><Input id="addr" value={form.address} onChange={(e) => set("address", e.target.value)} placeholder="House number, street, town" className="mt-3 h-12 rounded-xl" data-testid="quote-address-input" /></div>
-        <div><Label htmlFor="pc" className="eyebrow">Postcode</Label><Input id="pc" value={form.postcode} onChange={(e) => set("postcode", e.target.value.toUpperCase())} placeholder="e.g. SW19 2AB" className="mt-3 h-12 rounded-xl font-mono" data-testid="quote-postcode-input" />
-          {form.postcode && !postcodeOk && <p className="mt-1 text-xs text-red-600">Please enter a valid UK postcode</p>}</div>
       </div>
       <Block label="General condition">
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">

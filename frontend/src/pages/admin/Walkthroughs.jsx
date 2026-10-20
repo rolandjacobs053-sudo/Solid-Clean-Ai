@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Textarea } from "@/components/ui/textarea";
 import { Empty, PageHeader, StatusBadge, useLoad } from "@/components/admin/ui";
 import { PhotoGrid } from "@/components/admin/BookingDetail";
-import { FIELD_LABELS } from "@/components/site/WalkthroughForm";
+import { FIELD_LABELS } from "@/pages/site/CommercialRequest";
 
 const ENUM_KEYS = ["condition"];
 import { api, errMsg, fmtDate, fmtDateTime } from "@/lib/api";

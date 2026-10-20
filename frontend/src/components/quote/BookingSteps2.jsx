@@ -39,7 +39,7 @@ export function StepAccess({ access, setAccess }) {
   );
 }
 
-export function StepContact({ config, needsReview, date, setDate, slot, setSlot, contact, setContact, form, set, preview }) {
+export function StepContact({ config, needsReview, date, setDate, slot, setSlot, contact, setContact, form, set, preview, postcodeOk }) {
   return (
     <div className="space-y-8" data-testid="details-step">
       {needsReview
@@ -57,6 +57,10 @@ export function StepContact({ config, needsReview, date, setDate, slot, setSlot,
           <Input id="promo" value={form.promo_code} onChange={(e) => set("promo_code", e.target.value.toUpperCase())} className="mt-2 h-11 max-w-xs rounded-xl font-mono" data-testid="quote-promo-input" />
           {preview?.promo_error && form.promo_code && <p className="mt-1 text-xs text-red-600" data-testid="quote-promo-error">{preview.promo_error}</p>}
         </div>
+        <div className="sm:col-span-2 mt-2 border-t border-slate-200 pt-6"><p className="eyebrow">Property address</p></div>
+        <div className="sm:col-span-2"><Label htmlFor="addr">Address (house number, street, town)</Label><Input id="addr" value={form.address} onChange={(e) => set("address", e.target.value)} className="mt-2 h-11 rounded-xl" data-testid="quote-address-input" /></div>
+        <div><Label htmlFor="pc">Postcode</Label><Input id="pc" value={form.postcode} onChange={(e) => set("postcode", e.target.value.toUpperCase())} placeholder="e.g. SW19 2AB" className="mt-2 h-11 rounded-xl font-mono" data-testid="quote-postcode-input" />
+          {form.postcode && !postcodeOk && <p className="mt-1 text-xs text-red-600">Please enter a valid UK postcode</p>}</div>
         <label className="flex items-start gap-3 text-sm text-slate-600 sm:col-span-2">
           <Checkbox checked={contact.marketing_consent} onCheckedChange={(c) => setContact({ ...contact, marketing_consent: !!c })} data-testid="quote-marketing-consent-checkbox" />
           I'd like occasional offers and cleaning tips by email. (Optional - you can unsubscribe at any time.)

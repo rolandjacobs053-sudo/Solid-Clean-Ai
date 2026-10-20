@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { homeFor, useAuth } from "@/context/AuthContext";
 import { api, errMsg } from "@/lib/api";
-import { Logo } from "@/components/site/SiteHeader";
 
 export default function AdminLogin() {
   const { user, login } = useAuth();
@@ -29,18 +28,18 @@ export default function AdminLogin() {
 
   return (
     <main className="grid min-h-screen lg:grid-cols-2" data-testid="admin-login-page">
-      <div className="relative hidden overflow-hidden bg-slate-950 p-12 text-white lg:flex lg:flex-col lg:justify-between grain">
-        <Logo dark />
+      <div className="relative hidden overflow-hidden bg-[#023F00] p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        <span className="inline-flex w-fit rounded-2xl bg-white px-4 py-3"><img src="/brand/solidclean-logo.png" alt="Solid Clean Ltd" className="h-14 w-auto" /></span>
         <div>
-          <p className="eyebrow !text-teal-400">Command centre</p>
-          <h1 className="mt-4 max-w-md text-5xl font-extrabold leading-tight tracking-tight">The AI operating system for cleaning companies.</h1>
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#d9c56a]">Business dashboard</p>
+          <h1 className="mt-4 max-w-md text-5xl font-extrabold leading-tight tracking-tight">Solid Clean Ltd</h1>
         </div>
-        <p className="font-mono text-xs text-slate-500">Quotes, bookings, CRM, AI receptionist, outreach and analytics - one login.</p>
+        <p className="font-mono text-xs text-white/60">Bookings, customers, staff schedule, site walkthroughs and enquiries - one secure login.</p>
       </div>
       <div className="flex items-center justify-center p-6">
         <form onSubmit={submit} className="w-full max-w-sm space-y-5">
-          <div className="lg:hidden"><Logo /></div>
-          <h2 className="text-2xl font-bold text-slate-900">Sign in</h2>
+          <div className="lg:hidden"><img src="/brand/solidclean-logo.png" alt="Solid Clean Ltd" className="h-14 w-auto" /></div>
+          <h2 className="text-2xl font-bold text-slate-900">Sign in to Solid Clean Ltd</h2>
           <div><Label htmlFor="email">Email</Label><Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="mt-2 h-11" data-testid="admin-login-email-input" /></div>
           <div><Label htmlFor="pw">Password</Label><Input id="pw" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="mt-2 h-11" data-testid="admin-login-password-input" /></div>
           {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700" data-testid="admin-login-error">{error}</p>}

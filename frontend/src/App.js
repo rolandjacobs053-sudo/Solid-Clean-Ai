@@ -35,6 +35,7 @@ import Quotation from "@/pages/platform/Quotation";
 import Proposal from "@/pages/admin/Proposal";
 import SiteLayout from "@/pages/site/SiteLayout";
 import CommercialPage from "@/pages/site/CommercialPage";
+import CommercialRequest from "@/pages/site/CommercialRequest";
 import Walkthroughs from "@/pages/admin/Walkthroughs";
 import { AboutPage, AreasPage, ContactPage, FaqPage, HomePage, PolicyPage, ReviewsPage, ServiceDetail, ServicesPage } from "@/pages/site/SitePages";
 import Policies from "@/pages/admin/Policies";
@@ -92,6 +93,7 @@ function App() {
               <Route path="/services" element={<ServicesPage />} />
               <Route path="/services/commercial" element={<Navigate to="/commercial-cleaning" replace />} />
               <Route path="/commercial-cleaning" element={<CommercialPage />} />
+              <Route path="/commercial-cleaning/request" element={<CommercialRequest />} />
               <Route path="/services/:key" element={<ServiceDetail />} />
               <Route path="/quote" element={<QuotePage />} />
               <Route path="/book" element={<Navigate to="/quote" replace />} />
