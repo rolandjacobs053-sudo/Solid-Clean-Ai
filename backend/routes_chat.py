@@ -108,8 +108,8 @@ async def _handle_tags(full: str, conv: dict, s: dict):
             if result["status"] == "invalid":
                 notes.append("QUOTE FAILED: invalid service key - ask the customer again.")
                 continue
-            qid = await store_quote(data, result, lead_id, "ai_chat", cid)
-            events.append({"type": "quote", "quote_id": qid, "result": result})
+            qid, tok = await store_quote(data, result, lead_id, "ai_chat", cid)
+            events.append({"type": "quote", "quote_id": qid, "token": tok, "result": result})
             notes.append(f"QUOTE RESULT: status={result['status']} total=" + (f"£{result['total']:.2f}" if result.get("total") else "n/a")
                          + (f" reasons={result['reasons']}" if result["reasons"] else ""))
         elif kind == "LEAD":

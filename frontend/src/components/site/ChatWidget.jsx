@@ -30,7 +30,7 @@ function Escalate({ cid, pub, onDone }) {
 }
 
 function Bubble({ m }) {
-  if (m.role === "quote") return <QuoteCard quoteId={m.quote_id} result={m.result} />;
+  if (m.role === "quote") return <QuoteCard quoteId={m.quote_id} quoteToken={m.token} result={m.result} />;
   const user = m.role === "user";
   const text = user ? m.text : strip(m.text);
   if (!text) return <div className="h-8 w-14 animate-pulse rounded-2xl bg-slate-100" />;
@@ -73,7 +73,7 @@ export function ChatWidget() {
   const handle = (ev) => {
     if (ev.type === "delta") updateLast((t) => t + ev.text);
     else if (ev.type === "done") updateLast(() => ev.text);
-    else if (ev.type === "quote") push({ role: "quote", quote_id: ev.quote_id, result: ev.result });
+    else if (ev.type === "quote") push({ role: "quote", quote_id: ev.quote_id, token: ev.token, result: ev.result });
     else if (ev.type === "escalated") push({ role: "notice", text: "A member of our team has been notified and will call you back." });
     else if (ev.type === "error") updateLast(() => ev.text);
   };

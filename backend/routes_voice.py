@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from emergentintegrations.llm.chat import UserMessage
@@ -101,9 +102,10 @@ async def _email_quote(conv: dict, request: Request, slug: str) -> bool:
     q = await tdb.quotes.find_one({"conversation_id": str(conv["_id"]), "status": "sent", "emailed": {"$ne": True}}, sort=[("created_at", -1)])
     if not lead or not lead.get("email") or not q:
         return False
+    tok = q.get("token") or secrets.token_urlsafe(16)
     await log_comm(lead["email"], "email", "quote_sent", f"Your {company_name()} quote - £{q['total']:.2f}",
-                   quote_email(lead.get("name") or "there", q["result"]), lead_id=conv["lead_id"], link=booking_link(request, slug, str(q["_id"])))
-    await tdb.quotes.update_one({"_id": q["_id"]}, {"$set": {"emailed": True}})
+                   quote_email(lead.get("name") or "there", q["result"]), lead_id=conv["lead_id"], link=booking_link(request, slug, str(q["_id"]), tok))
+    await tdb.quotes.update_one({"_id": q["_id"]}, {"$set": {"emailed": True, "token": tok}})
     return True
 
 

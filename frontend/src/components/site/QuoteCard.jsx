@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowRight } from "lucide-react";
 import { gbp } from "@/lib/api";
 import { useTenant } from "@/lib/tenant";
 
-export function QuoteCard({ quoteId, result }) {
+export function QuoteCard({ quoteId, quoteToken, result }) {
   const navigate = useNavigate();
   const { base } = useTenant();
   const ok = result.status === "ok";
@@ -26,7 +26,7 @@ export function QuoteCard({ quoteId, result }) {
         <p key={r} className="mt-2 flex gap-2 text-xs text-amber-700"><AlertTriangle className="h-3.5 w-3.5 shrink-0" />{r}</p>
       ))}
       {ok && (
-        <button onClick={() => navigate(`${base}/quote?q=${quoteId}`)} data-testid="chat-quote-book-btn"
+        <button onClick={() => navigate(`${base}/quote?q=${quoteId}&t=${encodeURIComponent(quoteToken || "")}`)} data-testid="chat-quote-book-btn"
           className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-teal-600 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-700">
           Book this quote <ArrowRight className="h-4 w-4" />
         </button>

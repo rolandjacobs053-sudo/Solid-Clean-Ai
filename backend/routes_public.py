@@ -104,6 +104,7 @@ class BookingIn(QuoteSave):
     tip: float = Field(0, ge=0, le=500)
     auto_charge_consent: bool = False
     quote_id: Optional[str] = None
+    quote_token: str = ""
     origin_url: str
 
 
@@ -121,11 +122,16 @@ def _source(s: str) -> str:
     return s if s in SOURCES else "website"
 
 
-async def store_quote(q: dict, result: dict, lead_id, source: str, conversation_id=None, status=None) -> str:
-    doc = {"input": q, "result": result, "total": result.get("total"), "service_name": result.get("service_name"),
+def quote_token_ok(q: dict, t: str) -> bool:
+    return bool(q and q.get("token") and t and secrets.compare_digest(q["token"], t))
+
+
+async def store_quote(q: dict, result: dict, lead_id, source: str, conversation_id=None, status=None) -> tuple:
+    token = secrets.token_urlsafe(16)
+    doc = {"input": q, "token": token, "result": result, "total": result.get("total"), "service_name": result.get("service_name"),
            "status": status or ("sent" if result["status"] == "ok" else "needs_review"), "lead_id": lead_id, "source": source,
            "conversation_id": conversation_id, "follow_ups_sent": 0, "created_at": now_iso()}
-    return str((await tdb.quotes.insert_one(doc)).inserted_id)
+    return str((await tdb.quotes.insert_one(doc)).inserted_id), token
 
 
 async def notify_owner(settings: dict, subject: str, body: str, lead_id=None):
@@ -258,22 +264,22 @@ async def save_quote(body: QuoteSave, request: Request):
                                 f"Quote requested: {result['service_name']}" + (f" £{result['total']:.2f}" if result.get("total") else ""),
                                 {"marketing_consent": body.contact.marketing_consent})
     await tdb.leads.update_one({"_id": oid(lead_id), "status": "new"}, {"$set": {"status": "quoted"}})
-    quote_id = await store_quote(q, result, lead_id, src)
+    quote_id, token = await store_quote(q, result, lead_id, src)
     await attach_photos(body.photos, lead_id=lead_id, quote_id=quote_id)
     if result["status"] == "ok":
         await log_comm(body.contact.email, "email", "quote_sent", f"Your {company_name()} quote - £{result['total']:.2f}",
-                       quote_email(body.contact.name, result), lead_id=lead_id, link=booking_link(request, current_company.get()["slug"], quote_id))
+                       quote_email(body.contact.name, result), lead_id=lead_id, link=booking_link(request, current_company.get()["slug"], quote_id, token))
     else:
         await log_comm(body.contact.email, "email", "enquiry_ack", "We've received your enquiry",
                        f"Hi {body.contact.name}, thanks for your enquiry. A member of our team will review the details and contact you shortly.", lead_id=lead_id)
         await notify_owner(s, "Enquiry needs manual quote", f"{body.contact.name} ({body.contact.phone}): {'; '.join(result['reasons'])}", lead_id)
-    return {"quote_id": quote_id, "result": result}
+    return {"quote_id": quote_id, "token": token, "result": result}
 
 
 @public.get("/quotes/{quote_id}")
-async def get_quote(quote_id: str):
+async def get_quote(quote_id: str, t: str = ""):
     q = await tdb.quotes.find_one({"_id": oid(quote_id)})
-    if not q:
+    if not quote_token_ok(q, t):
         raise HTTPException(404, "Quote not found")
     inp = {k: v for k, v in q["input"].items() if k != "address"}
     return {"id": quote_id, "input": inp, "result": q["result"]}
@@ -310,11 +316,11 @@ async def create_booking(body: BookingIn):
                                 f"Booking started: {result['service_name']} on {fmt_date(body.date)} {body.slot}",
                                 {"marketing_consent": body.contact.marketing_consent})
     lead = await tdb.leads.find_one({"_id": oid(lead_id)})
-    quote_id = body.quote_id if body.quote_id and await tdb.quotes.find_one({"_id": oid(body.quote_id)}) else None
+    quote_id = body.quote_id if body.quote_id and quote_token_ok(await tdb.quotes.find_one({"_id": oid(body.quote_id)}), body.quote_token) else None
     if quote_id:
         await tdb.quotes.update_one({"_id": oid(quote_id)}, {"$set": {"lead_id": lead_id, "input": q, "result": result, "total": result["total"]}})
     else:
-        quote_id = await store_quote(q, result, lead_id, lead["source"], status="booking_started")
+        quote_id, _ = await store_quote(q, result, lead_id, lead["source"], status="booking_started")
     charge, tip = deposit_for(s, result["total"]), round(body.tip, 2)
     booking = {"tip": tip, "pay_terms_confirmed_at": now_iso(), "frequency": q.get("frequency") or None, "recurring": recurring,
                "residential": residential_summary(s["pricing"], q),

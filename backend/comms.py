@@ -67,6 +67,6 @@ def quote_email(name: str, quote: dict) -> str:
             f"Use the button below to choose an available date and time and pay securely to confirm.\n\nKind regards,\n{company_name()}")
 
 
-def booking_link(request, slug: str, quote_id: str) -> tuple:
+def booking_link(request, slug: str, quote_id: str, token: str) -> tuple:
     host = request.headers.get("x-forwarded-host") or request.headers.get("host")
-    return ("View quote & book", f"https://{host}/c/{slug}/quote?q={quote_id}")
+    return ("View quote & book", f"https://{host}/c/{slug}/quote?q={quote_id}&t={token}")

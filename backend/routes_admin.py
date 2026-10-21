@@ -167,7 +167,7 @@ async def balance_link(booking_id: str, request: Request):
     b = await tdb.bookings.find_one({"_id": oid(booking_id)})
     if not b or b.get("payment_status") != "deposit_paid" or not b.get("balance_due"):
         raise HTTPException(400, "There is no outstanding balance on this booking")
-    origin = booking_link(request, "x", "x")[1].split("/c/")[0]
+    origin = booking_link(request, "x", "x", "x")[1].split("/c/")[0]
     session = stripe.checkout.Session.create(
         mode="payment", customer_email=b["customer"]["email"], metadata={"booking_id": booking_id, "kind": "balance"},
         line_items=[{"quantity": 1, "price_data": {"currency": "gbp", "unit_amount": int(round(b["balance_due"] * 100)), "tax_behavior": "inclusive",

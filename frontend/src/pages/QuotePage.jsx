@@ -26,6 +26,7 @@ export default function QuotePage() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState(INITIAL);
   const [quoteId, setQuoteId] = useState(null);
+  const [quoteToken, setQuoteToken] = useState("");
   const [preview, setPreview] = useState(null);
   const [date, setDate] = useState();
   const [slot, setSlot] = useState("");
@@ -41,7 +42,8 @@ export default function QuotePage() {
   useEffect(() => {
     api.get(`${pub}/config`).then((r) => setConfig(r.data));
     const q = params.get("q");
-    if (q) api.get(`${pub}/quotes/${q}`).then((r) => { setForm({ ...INITIAL, ...r.data.input }); setQuoteId(q); setStep(1); }).catch(() => {});
+    const t = params.get("t") || "";
+    if (q) api.get(`${pub}/quotes/${q}`, { params: { t } }).then((r) => { setForm({ ...INITIAL, ...r.data.input }); setQuoteId(q); setQuoteToken(t); setStep(1); }).catch(() => {});
   }, [params, pub]);
 
   useEffect(() => {
@@ -74,7 +76,7 @@ export default function QuotePage() {
     try {
       if (mode === "book") {
         const accepted_policies = Object.fromEntries(required.map((x) => [x.key, x.published_version]));
-        const { data } = await api.post(`${pub}/bookings`, { quote: form, contact, date: format(date, "yyyy-MM-dd"), slot, access, photos: photoRefs, source: getSource(), quote_id: quoteId, accepted_policies, pay_terms_accepted: payOk, tip, origin_url: `${window.location.origin}${base}` });
+        const { data } = await api.post(`${pub}/bookings`, { quote: form, contact, date: format(date, "yyyy-MM-dd"), slot, access, photos: photoRefs, source: getSource(), quote_id: quoteId, quote_token: quoteToken, accepted_policies, pay_terms_accepted: payOk, tip, origin_url: `${window.location.origin}${base}` });
         if (data.confirmed) { toast.success(`Booking confirmed. ${data.payment_instructions || ""}`, { duration: 10000 }); setBusy(false); setStep(0); return; }
         window.location.href = data.checkout_url;
         return;
