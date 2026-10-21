@@ -1,4 +1,6 @@
+import asyncio
 import hashlib
+import ipaddress
 import json
 import logging
 import re
@@ -59,7 +61,7 @@ def _yt_id(url: str) -> str:
 
 def _html_text(html: str) -> tuple[str, str]:
     title = unescape((re.search(r"<title[^>]*>(.*?)</title>", html, re.S | re.I) or [None, ""])[1]).strip()
-    pub = (re.search(r'(?:article:published_time|datePublished)["\']?\s*(?:content=|:)\s*["\']([0-9]{4}-[0-9]{2}-[0-9]{2})', html) or [None, ""])[1]
+    pub = (re.search(r'(?:article:modified_time|dateModified|article:published_time|datePublished)["\']?\s*(?:content=|:)\s*["\']([0-9]{4}-[0-9]{2}-[0-9]{2})', html) or [None, ""])[1]
     body = re.sub(r"<(script|style|noscript|svg|nav|footer|header)[^>]*>.*?</\1>", " ", html, flags=re.S | re.I)
     body = unescape(re.sub(r"<[^>]+>", " ", body))
     return title, (f"[published {pub}] " if pub else "") + re.sub(r"\s+", " ", body).strip()
@@ -71,6 +73,12 @@ async def fetch_source(url: str) -> tuple[str, str, str]:
         raise HTTPException(422, "Please enter a full web address starting with https://")
     if any(host == b or host.endswith("." + b) for b in BLOCKED):
         raise HTTPException(422, "TikTok, Instagram, Facebook, LinkedIn and X block automated reading and require login. Copy the caption/transcript text into 'Paste text' instead.")
+    try:
+        infos = await asyncio.get_running_loop().getaddrinfo(host, None)
+    except OSError:
+        raise HTTPException(422, "That web address couldn't be found.")
+    if any(not ipaddress.ip_address(i[4][0]).is_global for i in infos):
+        raise HTTPException(422, "That address points to a private network and can't be read.")
     vid = _yt_id(url)
     if vid:
         from youtube_transcript_api import YouTubeTranscriptApi
@@ -139,7 +147,7 @@ async def ingest(body: IngestIn):
     if len(text) < 300:
         raise HTTPException(422, "There wasn't enough readable text in that source.")
     s = await tdb.settings.find_one({}, {"business.name": 1})
-    prompt = EXTRACT.format(biz=s["business"]["name"], n=6, topics="|".join(TOPICS), stype=stype, title=body.title or title, url=url or "(pasted by owner)", text=text[:45000])
+    prompt = EXTRACT.format(biz=s["business"]["name"], n=6, topics="|".join(TOPICS), stype=stype, title=body.title or title, url=url or "(pasted by owner)", text=text[:30000])
     try:
         raw = await ai_complete(prompt, "Extract the lessons now.")
         items = json.loads(raw[raw.find("["): raw.rfind("]") + 1])
@@ -167,9 +175,9 @@ async def list_items(q: str = "", topic: str = "", level: str = ""):
 
 @router.get("/stats")
 async def stats():
-    items = await tdb.knowledge.find({"status": {"$ne": "archived"}}, {"topic": 1, "source_type": 1, "evidence_level": 1, "status": 1, "source_url": 1}).to_list(5000)
+    items = await tdb.knowledge.find({"status": {"$ne": "archived"}}, {"topic": 1, "source_type": 1, "evidence_level": 1, "status": 1, "source_url": 1, "source_title": 1}).to_list(5000)
     count = lambda k: {v: len([i for i in items if i.get(k) == v]) for v in {i.get(k) for i in items}}  # noqa: E731
-    return {"lessons": len(items), "sources": len({i.get("source_url") or i["_id"] for i in items}), "by_topic": count("topic"),
+    return {"lessons": len(items), "sources": len({i.get("source_url") or i.get("source_title") for i in items}), "by_topic": count("topic"),
             "by_source_type": count("source_type"), "by_evidence": count("evidence_level"), "outdated": len([i for i in items if i["status"] == "outdated"]),
             "topics": TOPICS, "source_types": SOURCE_TYPES, "live_web_research": "not connected - needs a paid search API (e.g. Perplexity) with owner approval"}
 

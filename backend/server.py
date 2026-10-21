@@ -83,7 +83,7 @@ async def automation_loop():
 
 async def seed_knowledge_all():
     from core import db, set_tenant
-    async for company in db.companies.find({}):
+    async for company in db.companies.find({"$or": [{"comped": True}, {"subscription_status": "active"}]}):
         set_tenant(company)
         try:
             await routes_knowledge.seed_knowledge()

@@ -54,7 +54,19 @@ const Stage = ({ s, current }) => (
 export const GrowthPlan = () => {
   const [rm, reload] = useLoad("/admin/strategy/roadmap");
   const [busy, setBusy] = useState(false);
-  const gen = async () => { setBusy(true); try { await api.post("/admin/strategy/roadmap/generate"); reload(); toast.success("Roadmap updated from your latest data"); } catch (e) { toast.error(errMsg(e)); } setBusy(false); };
+  const gen = async () => {
+    setBusy(true);
+    try {
+      await api.post("/admin/strategy/roadmap/generate");
+      for (let i = 0; i < 60; i += 1) {
+        await new Promise((r) => setTimeout(r, 4000));
+        const { data } = await api.get("/admin/strategy/jobs/roadmap");
+        if (data.status === "done") { reload(); toast.success("Roadmap updated from your latest data"); break; }
+        if (data.status === "failed") { toast.error(data.error); break; }
+      }
+    } catch (e) { toast.error(errMsg(e)); }
+    setBusy(false);
+  };
   return (
     <div className="grid gap-6" data-testid="manager-growth-plan">
       <Goals />

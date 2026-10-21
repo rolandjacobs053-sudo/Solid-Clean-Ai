@@ -57,7 +57,7 @@ export default function CustomerDetail() {
           <Button onClick={() => setDialog({})} className="bg-[#023F00] hover:bg-[#012b00]" data-testid="customer-book-btn"><CalendarPlus className="mr-2 h-4 w-4" />Book a clean</Button>
         </div>
       </div>
-      <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1.4fr] [&>*]:min-w-0">
         <Panel title="Profile">
           {editing ? <><CustomerForm v={editing} set={setEditing} services={services} /><div className="mt-4 flex gap-2"><Button onClick={save} className="bg-[#023F00] hover:bg-[#012b00]" data-testid="customer-save-btn">Save</Button><Button variant="ghost" onClick={() => setEditing(null)}>Cancel</Button></div></> : (
             <dl className="grid gap-3 text-sm" data-testid="customer-profile">
@@ -70,7 +70,7 @@ export default function CustomerDetail() {
         </Panel>
         <Panel title={`Bookings (${d.bookings.length})`}>
           <Tabs defaultValue="upcoming">
-            <TabsList className="mb-2"><TabsTrigger value="upcoming" data-testid="customer-tab-upcoming">Upcoming ({groups.upcoming.length})</TabsTrigger><TabsTrigger value="completed" data-testid="customer-tab-completed">Completed ({groups.completed.length})</TabsTrigger><TabsTrigger value="cancelled" data-testid="customer-tab-cancelled">Cancelled ({groups.cancelled.length})</TabsTrigger></TabsList>
+            <TabsList className="mb-2 h-auto w-full justify-start overflow-x-auto sm:w-auto"><TabsTrigger value="upcoming" data-testid="customer-tab-upcoming">Upcoming ({groups.upcoming.length})</TabsTrigger><TabsTrigger value="completed" data-testid="customer-tab-completed">Completed ({groups.completed.length})</TabsTrigger><TabsTrigger value="cancelled" data-testid="customer-tab-cancelled">Cancelled ({groups.cancelled.length})</TabsTrigger></TabsList>
             {Object.entries(groups).map(([k, rows]) => <TabsContent key={k} value={k}><BookingList rows={rows} onEdit={(b) => setDialog({ booking: b })} onCancel={setCancel} /></TabsContent>)}
           </Tabs>
         </Panel>

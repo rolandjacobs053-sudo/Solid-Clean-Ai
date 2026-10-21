@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { api, errMsg } from "@/lib/api";
 
 const F = ({ label: l, children, wide }) => <div className={`space-y-1 ${wide ? "sm:col-span-2" : ""}`}><Label className="text-xs text-slate-600">{l}</Label>{children}</div>;
-const blank = (c) => ({ service: c?.service_interest || "regular", date: "", slot: "09:00", duration_hours: 3, price: "", payment_status: "due", amount_paid: "", payment_method: "", address: c?.address || "", postcode: c?.postcode || "", requirements: c?.requirements || "", special_instructions: c?.notes || "", assigned_to: "", send_confirmation: true });
+const blank = (c) => ({ service: c?.service_interest || "regular", date: "", slot: "09:00", duration_hours: 3, price: "", payment_status: "due", amount_paid: "", payment_method: "", address: c?.address || "", postcode: c?.postcode || "", requirements: c?.requirements || "", special_instructions: c?.notes || "", assigned_to: "", send_confirmation: false });
 
 export const BookingDialog = ({ open, onClose, customer, booking, services, staff, onSaved }) => {
   const edit = !!booking;

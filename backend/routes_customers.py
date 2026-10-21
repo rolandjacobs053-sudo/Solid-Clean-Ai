@@ -92,7 +92,7 @@ async def conflicts(day: str, slot: str, hours: float, assigned_to, lead_id: str
         bs = _mins(b.get("slot"))
         if bs < end and start < bs + int((b.get("duration_hours") or 3) * 60):
             hits.append(b)
-    hard = [b for b in hits if b.get("lead_id") == lead_id or (assigned_to and b.get("assigned_to") == assigned_to)]
+    hard = [b for b in hits if (lead_id and b.get("lead_id") == lead_id) or (assigned_to and b.get("assigned_to") == assigned_to)]
     summary = [{"id": str(b["_id"]), "reference": b.get("reference"), "slot": b.get("slot"), "customer": (b.get("customer") or {}).get("name"),
                 "service": b.get("service_name"), "assigned_name": b.get("assigned_name"), "double_booking": b in hard} for b in hits]
     over_capacity = len(hits) >= s["availability"]["capacity_per_slot"]
@@ -171,7 +171,7 @@ async def erase_customer(cid: str, ctx=Depends(require_admin)):
     if ctx["user"]["role"] != "owner":
         raise HTTPException(403, "Only the account owner can erase customer data")
     await _customer(cid)
-    if await tdb.bookings.count_documents({"lead_id": cid, "status": "confirmed", "date": {"$gte": now().date().isoformat()}}):
+    if await tdb.bookings.count_documents({"lead_id": cid, "status": {"$in": list(ACTIVE)}, "date": {"$gte": now().date().isoformat()}}):
         raise HTTPException(409, "This customer has upcoming bookings. Cancel them before erasing their data.")
     anon = {"name": "Erased customer", "email": None, "phone": None, "address": "", "property_details": "", "requirements": "", "notes": "", "erased": True,
             "erased_at": now_iso(), "timeline": [], "marketing_consent": False}

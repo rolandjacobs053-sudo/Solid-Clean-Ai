@@ -1,0 +1,53 @@
+{
+  "summary": "Tested iteration 15 end to end: Customer Management (CRUD, search, duplicates, manual bookings, double-booking and capacity conflicts with override, edit/reschedule/payment, cancel, GDPR erase), Strategy (goals, insights/alerts, roadmap, reports, cron, approvals scan/approve/reject), Industry Knowledge (stats, search, topic filter, outdated toggle, paste-text ingest, URL ingest, 409 dup, TikTok/Instagram refusal), priorities using goals/alerts, staff 403 / anon 401, mobile 390px and regression pages. Backend pytest: 20/20 pass. UI: everything worked except one HIGH issue. 'Build my roadmap' takes about 80s, but the preview ingress (Cloudflare) cuts requests at 60s and returns a 502 HTML page. The UI shows an error and does not show the roadmap, even though the backend saves it in the background (it appears after a page reload). All test data was removed from MongoDB.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/admin/strategy/roadmap/generate", "issue": "The LLM call takes about 80s, longer than the ingress 60s timeout. Reproduced with curl: 502 after 60.18s. The roadmap is saved anyway (tdb.roadmaps), but the client gets a 502, so the UI shows an error toast and never calls reload(). Fix: run generation in a BackgroundTask (or asyncio.create_task) and return 202 plus a job/status, then have the frontend poll GET /roadmap until created_at changes. Or stream with SSE keep-alives. Also shorten the prompt or output. Knowledge URL ingest (34s) and approvals scan (about 10s with 1 item, but up to 12 items in one LLM call) are at risk of the same 60s limit.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/admin/knowledge/stats", "issue": "The 'sources' count is wrong for pasted text with no URL. It uses source_url or the lesson _id, so each lesson counts as its own source: pasting 1 text that gave 3 lessons moved the count from 18 to 21 sources. Use source_url or source_title, or count knowledge_sources."},
+      {"endpoint": "knowledge outdated flag", "issue": "Wikipedia lessons get the page creation datePublished (for example 2005), so 43 of 107 seeded lessons show 'possibly outdated', even though the articles are kept current. Consider using dateModified/last-modified for wiki pages, or not auto-flagging encyclopaedia sources."},
+      {"endpoint": "POST /api/cron/manager-report/{kind} -> run_reports", "issue": "Loops over every company with settings and runs build_report. goals_with_progress() then seeds the Solid Clean-specific '£10,000 monthly profit' and '£400 million' goals into every other tenant (this happened to company solid-clean-ltd 6acb2c2d... during the test; I removed those goals). It also spends LLM calls on every tenant, including trial/expired ones. Limit it to this company or to active/paid tenants, and only seed goals for the owner company."},
+      {"endpoint": "PATCH /api/admin/customers/bookings/{bid} conflicts()", "issue": "The hard-conflict check matches on b.get('lead_id') == lead_id. If an online booking has lead_id None, every other booking with lead_id None is treated as a 'double booking'. Guard with `lead_id and ...`."},
+      {"endpoint": "DELETE /api/admin/customers/{cid}", "issue": "The erase block only counts status=='confirmed'. Upcoming awaiting_approval/pending_payment bookings don't block erase. Use the ACTIVE tuple."},
+      {"endpoint": "PATCH /api/admin/bookings/{id} status=cancelled (used by the Customers cancel button)", "issue": "Always emails the customer 'Your booking has been cancelled' with no notify toggle. For manual cash/deposit bookings, the timeline says 'Any refund must be approved and issued manually in Stripe', which is misleading for non-Stripe payments."},
+      {"endpoint": "edit_booking timeline", "issue": "A price/payment-only change logs 'Booking X updated' with no detail of the new price, payment status or balance."},
+      {"endpoint": "list_customers search", "issue": "Phone search only removes spaces when the query is all digits, so '+44 7000...' or '07000-555' won't match a stored phone."},
+      {"endpoint": "business_data insights", "issue": "Wording: '1 quotes were sent...' (plural). It also says 'Follow-ups are ready in Approvals' before any scan has been run."},
+      {"endpoint": "CORS (ingress)", "issue": "The login response has access-control-allow-origin: * together with allow-credentials: true. This is probably set by the preview ingress; check explicit origins in production."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "GrowthPlan roadmap-generate-btn", "issue": "Shows an error after 60s (proxy 502) and never shows the roadmap that the backend saved. The owner has to reload. See backend critical.", "selector": "[data-testid='roadmap-generate-btn']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Customer detail (mobile 390px)", "issues": ["The page overflows horizontally (scrollWidth 407 > 390). All 3 sections (Profile, Bookings, Communication history) are 17px wider than the viewport, so the right borders are clipped. Likely cause: the grid at CustomerDetail.jsx:60 with no grid-cols-1 or min-w-0, plus the non-wrapping Upcoming/Completed/Cancelled TabsList. Add `grid-cols-1 min-w-0` to the children and `overflow-x-auto` to the TabsList."]},
+      {"screen": "BookingDialog", "issues": ["'Email the customer a booking confirmation' is ticked by default for new bookings. This is a reasonable choice, but the owner could easily send emails by accident while entering past or phone bookings."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter15_customers_strategy_knowledge.py", "/app/test_reports/pytest/pytest_iter15.xml"],
+  "action_items": [
+    "HIGH: Make roadmap generation async (background task plus polling, or SSE) so it is not cut by the 60s ingress timeout. Do the same for any LLM endpoint that can go over 60s (knowledge URL ingest of long pages, approvals scan with many items).",
+    "Fix knowledge stats source counting for pasted-text sources.",
+    "Restrict the cron run_reports and goal seeding to the right tenant(s).",
+    "Guard conflicts() hard-match against lead_id None. Use the ACTIVE statuses in the erase upcoming check.",
+    "Fix the customer detail horizontal overflow on mobile.",
+    "Optional: add a notify toggle on cancel for manual bookings and a better refund message. Add price/payment details to the edit timeline text. Fix the '1 quotes' wording."
+  ],
+  "critical_code_review_comments": [
+    "routes_strategy.generate_roadmap: a long synchronous LLM call in the request cycle breaks behind the 60s proxy (confirmed).",
+    "routes_knowledge.fetch_source: fetches any http(s) URL from the server, including internal hosts such as localhost:8001. It is owner-only, but blocking private and loopback IPs would close the SSRF risk.",
+    "routes_strategy.delete_goal and reject() never return 404 for unknown ids.",
+    "routes_knowledge.ingest only checks duplicates by URL. Pasted text with no URL can be ingested again; the lesson fingerprint dedupe helps only partly."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter15_customers_strategy_knowledge.py"],
+  "success_rate": {"backend": "100% (20/20 pytest), 1 HIGH timeout issue found via curl", "frontend": "~94% (all flows pass except roadmap display after generate)"},
+  "test_credentials": "Owner admin@solidcleanltd.com / SolidClean#2026 (from /app/memory/test_credentials.md). bcrypt $2b$ hash and httpOnly cookies set. Brute-force lockout was not tested, to avoid locking the real owner account.",
+  "seed_data_creation": "Temporary data was created and then deleted from MongoDB: TEST_ customers (UI Dora, Eve, Finn, Approval Lead, plus pytest Alice/Bob/Carl), their bookings and communications, the TEST_ quote, 2 approvals (1 approved to test_approval_iter15@example.com, 1 rejected), TEST_ goals, 4 reports, 2 roadmaps, 3 priorities, TEST_ notes and Wikipedia 'Commercial cleaning' knowledge lessons and sources, the TEST_ chat, the cron_run TEST_ id, the TEST_ staff user, and the 2 goals seeded into tenant solid-clean-ltd by cron. Also deleted, as requested: 'TEST_ Jane Smith' (6ad86421a7712d270afe1eef) and its booking. The knowledge base is back to 107 lessons from 18 sources; the original daily report 6ad86430... is kept.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Today in this env is 2026-10-21. Use future dates in Nov 2026 for bookings (slots 08/11/14, capacity 2, 3h). Run pytest with -n 0 (xdist is on by default and breaks the shared-state fixtures). The cron test triggers reports for ALL tenants and seeds goals into tenant 6acb2c2d...; clean up afterwards. Roadmap: check with a curl timing test (expect it under 60s, or a 202 plus polling, after the fix). Approvals need a non-demo 'sent' quote created 2-30 days ago with a lead email. Insert a TEST_ lead and quote via mongosh (company_id 6acb2a20e5d23531c955e49b), then delete them.",
+  "rca of the issue": "Roadmap: the UI calls POST /api/admin/strategy/roadmap/generate. ai_complete with about 30k chars of context takes about 80s. The Kubernetes/Cloudflare ingress closes the connection at 60s and returns a 502 HTML page. axios rejects, so toast.error runs and reload() is skipped. Uvicorn keeps going and inserts the roadmap, which is why it appears after a reload. Repro: curl -b cookie -X POST $URL/api/admin/strategy/roadmap/generate gives 502 in 60.18s, and db.roadmaps then grows by 1. Fix: run it in the background and poll."
+}

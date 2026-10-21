@@ -11,7 +11,19 @@ export const Reports = () => {
   const [list, reload] = useLoad("/admin/strategy/reports");
   const [open, setOpen] = useState(null);
   const [busy, setBusy] = useState("");
-  const gen = async (kind) => { setBusy(kind); try { const { data } = await api.post("/admin/strategy/reports/generate", { kind }); setOpen(data); reload(); } catch (e) { toast.error(errMsg(e)); } setBusy(""); };
+  const gen = async (kind) => {
+    setBusy(kind);
+    try {
+      await api.post("/admin/strategy/reports/generate", { kind });
+      for (let i = 0; i < 45; i += 1) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const { data } = await api.get(`/admin/strategy/jobs/report_${kind}`);
+        if (data.status === "done") { setOpen((await api.get(`/admin/strategy/reports/${data.result_id}`)).data); reload(); break; }
+        if (data.status === "failed") { toast.error(data.error); break; }
+      }
+    } catch (e) { toast.error(errMsg(e)); }
+    setBusy("");
+  };
   const view = async (id) => { try { setOpen((await api.get(`/admin/strategy/reports/${id}`)).data); } catch (e) { toast.error(errMsg(e)); } };
   return (
     <div className="grid gap-6 lg:grid-cols-[280px_1fr]" data-testid="manager-reports">

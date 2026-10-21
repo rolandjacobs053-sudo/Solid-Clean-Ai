@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from ai import ai_complete
 from business_data import LIVE, insights, snapshot
 from comms import add_event, is_suppressed, log_comm
-from core import audit, db, now, now_iso, oid, out, outs, require_owner, set_tenant, tdb
+from core import audit, current_company, db, now, now_iso, oid, out, outs, require_owner, set_tenant, tdb
 from routes_knowledge import relevant
 
 router = APIRouter(prefix="/api/admin/strategy", dependencies=[Depends(require_owner)])
@@ -49,7 +49,7 @@ def metric_value(snap: dict, metric: str):
 
 async def goals_with_progress(snap=None) -> list:
     snap = snap or await snapshot()
-    if not await tdb.goals.count_documents({}):
+    if not await tdb.goals.count_documents({}) and current_company.get().get("comped"):
         for g in ({"title": "£10,000 monthly profit", "metric": "monthly_profit", "target": 10000, "deadline": "", "notes": "Owner's first milestone"},
                   {"title": "£400 million annual revenue (long-term ambition)", "metric": "annual_revenue_run_rate", "target": 400_000_000, "deadline": "", "notes": "Owner's long-term ambition; alternative: £400m valuation"}):
             await tdb.goals.insert_one({**g, "status": "active", "created_at": now_iso()})
@@ -83,7 +83,8 @@ async def edit_goal(gid: str, body: GoalIn):
 
 @router.delete("/goals/{gid}")
 async def delete_goal(gid: str):
-    await tdb.goals.update_one({"_id": oid(gid)}, {"$set": {"status": "archived"}})
+    if not (await tdb.goals.update_one({"_id": oid(gid)}, {"$set": {"status": "archived"}})).matched_count:
+        raise HTTPException(404, "Goal not found")
     return {"ok": True}
 
 
@@ -114,21 +115,45 @@ async def get_roadmap():
     return out(r) if r else None
 
 
-@router.post("/roadmap/generate")
-async def generate_roadmap():
+async def _job(kind: str, coro):
+    await tdb.jobs.update_one({"kind": kind}, {"$set": {"status": "running", "error": None, "started_at": now_iso()}}, upsert=True)
+    try:
+        res = await coro
+        await tdb.jobs.update_one({"kind": kind}, {"$set": {"status": "done", "result_id": res, "finished_at": now_iso()}})
+    except Exception:
+        logger.exception("%s job failed", kind)
+        await tdb.jobs.update_one({"kind": kind}, {"$set": {"status": "failed", "error": "The AI couldn't finish this right now. Please try again.", "finished_at": now_iso()}})
+
+
+async def _start(kind: str, coro, background: BackgroundTasks):
+    j = await tdb.jobs.find_one({"kind": kind})
+    if j and j["status"] == "running" and j["started_at"] > (now() - timedelta(minutes=5)).isoformat():
+        coro.close()
+        return {"status": "running"}
+    await tdb.jobs.update_one({"kind": kind}, {"$set": {"status": "running", "error": None, "started_at": now_iso()}}, upsert=True)
+    background.add_task(_job, kind, coro)
+    return {"status": "running"}
+
+
+@router.get("/jobs/{kind}")
+async def job_status(kind: str):
+    j = await tdb.jobs.find_one({"kind": kind}, {"_id": 0})
+    return j or {"status": "idle"}
+
+
+async def _roadmap() -> str:
     snap = await snapshot()
     s = await tdb.settings.find_one({}, {"business.name": 1})
     know = await relevant("scaling growth expansion franchising acquisition commercial contracts recurring revenue valuation management team", 14)
-    try:
-        raw = await ai_complete(ROADMAP.format(biz=s["business"]["name"], knowledge=json.dumps(know)[:14000], today=snap["today"], data=json.dumps(snap, default=str)[:16000]), "Build the roadmap.")
-        plan = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
-        assert len(plan["stages"]) >= 5
-    except Exception:
-        logger.exception("roadmap failed")
-        raise HTTPException(502, "Couldn't build the roadmap right now. Please try again.")
-    doc = {**plan, "knowledge_used": len(know), "created_at": now_iso()}
-    await tdb.roadmaps.insert_one(doc)
-    return await get_roadmap()
+    raw = await ai_complete(ROADMAP.format(biz=s["business"]["name"], knowledge=json.dumps(know)[:14000], today=snap["today"], data=json.dumps(snap, default=str)[:16000]), "Build the roadmap.")
+    plan = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
+    assert len(plan["stages"]) >= 5
+    return str((await tdb.roadmaps.insert_one({**plan, "knowledge_used": len(know), "created_at": now_iso()})).inserted_id)
+
+
+@router.post("/roadmap/generate")
+async def generate_roadmap(background: BackgroundTasks):
+    return await _start("roadmap", _roadmap(), background)
 
 
 REPORT = """You are the AI Business Manager for {biz}. Write the owner's {kind} business report in markdown, using ONLY the live data, alerts, goals and pending approvals below. Label actual vs estimate. No invented numbers. Be specific and brief.
@@ -169,12 +194,10 @@ async def get_report(rid: str):
 
 
 @router.post("/reports/generate")
-async def generate_report(body: ReportIn):
-    try:
-        return await build_report(body.kind)
-    except Exception:
-        logger.exception("report failed")
-        raise HTTPException(502, "Couldn't generate the report right now. Please try again.")
+async def generate_report(body: ReportIn, background: BackgroundTasks):
+    async def run():
+        return (await build_report(body.kind))["id"]
+    return await _start(f"report_{body.kind}", run(), background)
 
 
 DRAFT = """You write short, warm, professional UK-English emails for {biz}. For each item below write one email. Never invent prices, discounts or promises not in the item. No pressure tactics. Sign off as "{biz}".
@@ -199,7 +222,7 @@ async def scan_candidates() -> list:
         if str(p["_id"]) not in pending and not await is_suppressed(p["email"]):
             cands.append({"kind": "prospect_follow_up", "ref_id": str(p["_id"]), "lead_id": None, "to": p["email"], "name": p.get("contact_name") or p.get("company"),
                           "context": f"Commercial prospect {p.get('company')} ({p.get('sector')}, {p.get('area')}), status {p['status']}, last contacted {str(p.get('last_contacted_at'))[:10]}. Offer a free site walkthrough."})
-    return cands[:12]
+    return cands[:6]
 
 
 @router.get("/approvals")
@@ -252,12 +275,13 @@ async def approve(aid: str, request: Request):
 
 @router.post("/approvals/{aid}/reject")
 async def reject(aid: str):
-    await tdb.approvals.update_one({"_id": oid(aid), "status": "pending"}, {"$set": {"status": "rejected", "rejected_at": now_iso()}})
+    if not (await tdb.approvals.update_one({"_id": oid(aid), "status": "pending"}, {"$set": {"status": "rejected", "rejected_at": now_iso()}})).matched_count:
+        raise HTTPException(404, "Draft not found or already handled")
     return {"ok": True}
 
 
 async def run_reports(kind: str):
-    async for company in db.companies.find({}):
+    async for company in db.companies.find({"$or": [{"comped": True}, {"subscription_status": "active"}]}):
         set_tenant(company)
         try:
             if not await tdb.settings.find_one({}, {"_id": 1}):
