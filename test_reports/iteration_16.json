@@ -1,0 +1,39 @@
+{
+  "summary": "Retest of the iteration_15 fixes. All requested fixes pass. Backend: new pytest file test_iter16_async_jobs_fixes.py, 11/11 pass. (1) POST /roadmap/generate returns {status:'running'} in under 10s. A second POST while running returns 'running' and does not start a duplicate: exactly 1 new roadmap was written. GET /jobs/roadmap moves from running to done with a result_id that matches GET /roadmap, in about 80s. (2) SSRF: localhost:8001, 127.0.0.1, 169.254.169.254 and 10.0.0.1 all return 422 'private network'. (3) Knowledge stats: outdated=0. Pasting a TEST_ text added several lessons but only 1 source; after deleting them, sources was back to the original count. (4) Two bookings with lead_id None at overlapping times: PATCH move gives 200, not a double booking. (5) Erase gives 409 for awaiting_approval, pending_payment and confirmed upcoming bookings, and 200 after the booking is cancelled. (6) DELETE goals/{bad id} and POST approvals/{bad id}/reject give 404 for both a valid-format id and a malformed id. (7) Regression: create customer, book, reschedule (moved=true, persisted), cancel. UI (Playwright): Goals & Roadmap tab: roadmap-generate-btn showed 'Analysing… (about a minute)' and was disabled. After 80s it re-enabled, the 'Roadmap updated from your latest data' toast showed, the roadmap id changed, roadmap-stage-1..7 rendered with new content, no reload, and no error toast or console errors. Reports: report-generate-daily polled and the new daily report showed in report-view after 16s with no reload (job done, result_id set). Mobile 390x844 customer detail: document scrollWidth is 390 and the booking TabsList has overflow-x:auto (scrollWidth 352 > clientWidth 316) and the tabs switch. The new-booking and edit dialogs both have booking-notify-checkbox unchecked. Approvals cap (cands[:6]), run_reports filter (comped OR subscription_status active) and seeding goals only for the comped company were checked by code review. LLM calls made: 2 roadmaps + 1 report + 1 knowledge extraction. Cleanup: all TEST_ leads, bookings and knowledge deleted. I deleted the intermediate roadmap made by the API test (6ad86a0c...). I kept the newest roadmap made from the UI (6ad86ae538f47b5d446d23fa) and the new daily report (6ad86af838f47b5d446d23fb).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/knowledge/ingest (fetch_source SSRF guard)", "issue": "The guard only checks the DNS result of the first host. httpx is then called with follow_redirects=True and resolves the name again. So a public URL that 302-redirects to http://127.0.0.1 or 169.254.169.254, or a DNS-rebinding host, gets past the guard. Fix: follow_redirects=False and re-check each Location hop (max about 5), or use a transport that checks the connected IP."},
+      {"endpoint": "_start() job dedupe (routes_strategy.py)", "issue": "The duplicate check is find_one then update_one, which is not atomic. Two concurrent POSTs arriving in the same few milliseconds could both start the LLM job (sequential double-clicks are handled; I confirmed only 1 roadmap was written). Use one find_one_and_update with the filter {kind, $or:[status!=running, started_at<now-5min]} and start the job only if it matched or upserted."},
+      {"endpoint": "jobs stuck state", "issue": "If the backend restarts mid-job (hot reload or deploy), the job stays 'running' until the 5-minute stale window ends. The UI then polls 60x4s (roadmap) or 45x3s (report) and stops silently, with no toast and no explanation. Show a 'still working, check back shortly' message when polling runs out."},
+      {"endpoint": "GET /api/admin/customers stats.upcoming", "issue": "This still counts only status=='confirmed', while erase and conflicts now use ACTIVE (which includes awaiting_approval and pending_payment). The list could show 0 upcoming while erase is blocked."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "BookingDialog", "issues": ["Date and Start time use the browser's native <input type='date'/'time'> instead of the shadcn Calendar/Popover picker. This is inconsistent with the rest of the design system."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter16_async_jobs_fixes.py", "/app/test_reports/pytest/pytest_iter16.xml"],
+  "action_items": [
+    "Close the SSRF redirect and DNS-rebinding gap in fetch_source (disable follow_redirects and re-validate each hop)",
+    "Make the _start job lock atomic with find_one_and_update",
+    "Show a message when roadmap or report polling times out or the job is stale",
+    "Align the customers list 'upcoming' stat with the ACTIVE statuses",
+    "Optional: replace the native date/time inputs in BookingDialog with the shadcn Calendar"
+  ],
+  "critical_code_review_comments": [
+    "BackgroundTasks keep the tenant contextvar correctly; I confirmed jobs and roadmaps are written with the right company_id",
+    "fetch_source: the getaddrinfo check is TOCTOU and redirects are followed (see minor issue)",
+    "_start: there is a non-atomic gap between the check and the set",
+    "The old iteration_15 minor items not in this retest scope are still open: the cancel email always sends with no notify toggle and has Stripe refund wording for cash bookings; the edit_booking timeline has no price detail; phone search normalisation; insights plural wording"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter16_async_jobs_fixes.py"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% (all requested UI checks passed)"},
+  "seed_data_creation": "None kept. All TEST_ customers, bookings and knowledge were deleted. I kept 1 new real roadmap (6ad86ae538f47b5d446d23fa) and 1 daily report (6ad86af838f47b5d446d23fb) as real outputs.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use /app/backend/tests/test_iter16_async_jobs_fixes.py for regression of the async jobs (roadmap takes about 80s, the test polls up to 225s), SSRF, knowledge stats, conflicts and erase. The iteration_15 file still expects a synchronous roadmap/report in places; prefer the iter16 file. Solid Clean company_id is 6acb2a20e5d23531c955e49b. The jobs collection is keyed by {company_id, kind}."
+}

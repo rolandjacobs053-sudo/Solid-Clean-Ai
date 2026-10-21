@@ -20,6 +20,7 @@ export const Reports = () => {
         const { data } = await api.get(`/admin/strategy/jobs/report_${kind}`);
         if (data.status === "done") { setOpen((await api.get(`/admin/strategy/reports/${data.result_id}`)).data); reload(); break; }
         if (data.status === "failed") { toast.error(data.error); break; }
+        if (i === 44) toast.message("Still working - check back in a few minutes.");
       }
     } catch (e) { toast.error(errMsg(e)); }
     setBusy("");

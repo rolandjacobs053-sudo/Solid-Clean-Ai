@@ -176,6 +176,8 @@ async def seed_all():
     await db.login_attempts.create_index("identifier")
     await db.leads.create_index([("company_id", 1), ("email", 1)])
     await db.bookings.create_index([("company_id", 1), ("date", 1), ("slot", 1)])
+    await db.jobs.create_index([("company_id", 1), ("kind", 1)], unique=True)
+
     if "email_1" in await db.suppressions.index_information():
         await db.suppressions.drop_index("email_1")
     await db.suppressions.create_index([("company_id", 1), ("email", 1)], unique=True)

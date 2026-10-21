@@ -124,7 +124,7 @@ async def list_customers(q: str = ""):
     async for b in tdb.bookings.find({"lead_id": {"$in": [lead["id"] for lead in leads]}, "status": {"$ne": "abandoned"}}, {"lead_id": 1, "status": 1, "date": 1, "total": 1, "payment_status": 1, "balance_due": 1}):
         st = stats.setdefault(b["lead_id"], {"bookings": 0, "upcoming": 0, "completed": 0, "spend": 0.0, "last_date": None})
         st["bookings"] += 1
-        st["upcoming"] += b["status"] == "confirmed" and b["date"] >= now().date().isoformat()
+        st["upcoming"] += b["status"] in ACTIVE and b["date"] >= now().date().isoformat()
         st["completed"] += b["status"] == "completed"
         st["spend"] += float(b.get("total") or 0) - float(b.get("balance_due") or 0) if b.get("payment_status") in ("paid", "deposit_paid") else 0
         st["last_date"] = max(st["last_date"] or "", b["date"])

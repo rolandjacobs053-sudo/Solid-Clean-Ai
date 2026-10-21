@@ -7,6 +7,7 @@ from typing import Literal, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from pymongo.errors import DuplicateKeyError
 
 from ai import ai_complete
 from business_data import LIVE, insights, snapshot
@@ -126,11 +127,13 @@ async def _job(kind: str, coro):
 
 
 async def _start(kind: str, coro, background: BackgroundTasks):
-    j = await tdb.jobs.find_one({"kind": kind})
-    if j and j["status"] == "running" and j["started_at"] > (now() - timedelta(minutes=5)).isoformat():
+    stale = (now() - timedelta(minutes=5)).isoformat()
+    try:
+        await tdb.jobs.update_one({"kind": kind, "$or": [{"status": {"$ne": "running"}}, {"started_at": {"$lt": stale}}]},
+                                  {"$set": {"status": "running", "error": None, "started_at": now_iso()}}, upsert=True)
+    except DuplicateKeyError:
         coro.close()
         return {"status": "running"}
-    await tdb.jobs.update_one({"kind": kind}, {"$set": {"status": "running", "error": None, "started_at": now_iso()}}, upsert=True)
     background.add_task(_job, kind, coro)
     return {"status": "running"}
 

@@ -63,6 +63,7 @@ export const GrowthPlan = () => {
         const { data } = await api.get("/admin/strategy/jobs/roadmap");
         if (data.status === "done") { reload(); toast.success("Roadmap updated from your latest data"); break; }
         if (data.status === "failed") { toast.error(data.error); break; }
+        if (i === 59) toast.message("Still working - check back in a few minutes.");
       }
     } catch (e) { toast.error(errMsg(e)); }
     setBusy(false);

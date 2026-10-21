@@ -67,18 +67,23 @@ def _html_text(html: str) -> tuple[str, str]:
     return title, (f"[published {pub}] " if pub else "") + re.sub(r"\s+", " ", body).strip()
 
 
-async def fetch_source(url: str) -> tuple[str, str, str]:
+async def _guard(url: str):
     host = (urlparse(url).hostname or "").lower()
     if urlparse(url).scheme not in ("http", "https") or not host:
         raise HTTPException(422, "Please enter a full web address starting with https://")
-    if any(host == b or host.endswith("." + b) for b in BLOCKED):
-        raise HTTPException(422, "TikTok, Instagram, Facebook, LinkedIn and X block automated reading and require login. Copy the caption/transcript text into 'Paste text' instead.")
     try:
         infos = await asyncio.get_running_loop().getaddrinfo(host, None)
     except OSError:
         raise HTTPException(422, "That web address couldn't be found.")
     if any(not ipaddress.ip_address(i[4][0]).is_global for i in infos):
         raise HTTPException(422, "That address points to a private network and can't be read.")
+
+
+async def fetch_source(url: str) -> tuple[str, str, str]:
+    host = (urlparse(url).hostname or "").lower()
+    if any(host == b or host.endswith("." + b) for b in BLOCKED):
+        raise HTTPException(422, "TikTok, Instagram, Facebook, LinkedIn and X block automated reading and require login. Copy the caption/transcript text into 'Paste text' instead.")
+    await _guard(url)
     vid = _yt_id(url)
     if vid:
         from youtube_transcript_api import YouTubeTranscriptApi
@@ -92,8 +97,14 @@ async def fetch_source(url: str) -> tuple[str, str, str]:
         meta = r.json() if r.status_code == 200 else {}
         return f"{meta.get('title', 'YouTube video')} - {meta.get('author_name', '')}".strip(" -"), text, "youtube"
     try:
-        async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers={"User-Agent": "SolidCleanResearchBot/1.0 (business research; contact info@solidcleanltd.com) httpx"}) as c:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=False, headers={"User-Agent": "SolidCleanResearchBot/1.0 (business research; contact info@solidcleanltd.com) httpx"}) as c:
             r = await c.get(url)
+            for _ in range(5):
+                if not r.is_redirect:
+                    break
+                nxt = str(r.next_request.url)
+                await _guard(nxt)
+                r = await c.get(nxt)
     except httpx.HTTPError:
         raise HTTPException(502, "Couldn't reach that web page. Check the address or paste the text instead.")
     if r.status_code in (401, 402, 403):

@@ -83,4 +83,14 @@ Earlier history: started as an integrated Solid Clean system, then a multi-tenan
 - Tested: iteration_14 (27 backend tests pass, full UI incl. voice loop with injected speech, mobile). Follow-up fixes: demo filter on escalations/carpet/walkthroughs, quotes split into contactable vs anonymous price checks, mobile tabs scroll, voice "thinking" state, chat delete error handling.
 - Known: Overview dashboard counts demo records while Manager/Finance exclude them. No Google Business Profile / Search Console / Ads / accounting data connected.
 
+## 2026-10-21 - Growth partner (£400m ambition) + Customer Management
+- User asks: AI Business Manager built around scaling to £400m revenue or valuation; wide knowledge sources (web, YouTube, books, social, podcasts) organised into a searchable knowledge base; roadmap, goals, analysis, alerts, reports (dashboard only; owner email gilmar@solidcleanltd.com noted for future), approval queue. Plus Customer Management (manual profiles, dashboard bookings, edit/reschedule/cancel, conflicts, search, UK GDPR).
+- Backend: routes_customers.py (/api/admin/customers: CRUD, search, duplicate 409, manual bookings w/ conflict check (hard double booking vs capacity override), edit/reschedule, owner-only GDPR erase), routes_knowledge.py (/api/admin/knowledge: URL/YouTube/pasted-text ingest -> AI lesson extraction with evidence levels, dedupe, outdated flag, SSRF guard; relevant() retrieval; seed from knowledge_seed.json at startup for comped/active tenants), routes_strategy.py (/api/admin/strategy: goals w/ live progress, insights, async roadmap + reports via jobs collection + polling, approvals scan/edit/approve(send via log_comm)/reject; /api/cron/manager-report/{daily|weekly}), business_data.deep_metrics + insights. Manager chat context now includes roadmap, goals, alerts, approvals, relevant knowledge.
+- Crons: manager-daily-brief 06:30 and manager-weekly-review Mon 07:00 Europe/London (alongside recurring-cleans).
+- Frontend: /admin/customers, /admin/customers/:id; Business Manager tabs Goals & Roadmap, Reports, Approvals, Industry knowledge; Alerts strip in Assistant.
+- Knowledge base: 107 lessons from 18 sources actually read (case studies: ISS, Mitie, ABM, Rentokil Initial, ServiceMaster, Merry Maids, Jani-King, Molly Maid, Tidy Casa, Queen Bee; valuation benchmarks; commercial bidding guides; BCC research news; franchising).
+- Limitations: YouTube transcript fetch blocked from server (RequestBlocked) -> paste transcript; TikTok/Instagram/Facebook/LinkedIn/X refused (login walls) -> paste captions; paywalled/blocked sites need pasted text; no live web search (needs paid API e.g. Perplexity, owner approval).
+- Tested: iteration_15 (20/20 backend + full UI) and iteration_16 (fix retest 11/11). Post-test fixes: SSRF redirect re-check, atomic job lock (unique index jobs company_id+kind), polling timeout message, customer upcoming stat uses ACTIVE.
+
+
 
