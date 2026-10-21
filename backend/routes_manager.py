@@ -141,9 +141,9 @@ async def send(cid: str, body: MessageIn):
     await tdb.manager_chats.update_one({"_id": oid(cid)}, upd)
     chat = new_chat(system, f"mgr-{cid}")
 
-    async def save(text: str, stopped: bool = False, error: bool = False):
+    async def save(text: str, stopped: bool = False, error: bool = False, suggestions: list = ()):
         if text or stopped or error:
-            await tdb.manager_chats.update_one({"_id": oid(cid)}, {"$push": {"messages": {"role": "assistant", "text": text, "via": body.via, "stopped": stopped, "error": error, "at": now_iso()}},
+            await tdb.manager_chats.update_one({"_id": oid(cid)}, {"$push": {"messages": {"role": "assistant", "text": text, "via": body.via, "stopped": stopped, "error": error, "suggestions": list(suggestions), "at": now_iso()}},
                                                                     "$set": {"updated_at": now_iso()}})
 
     async def gen():
@@ -157,13 +157,16 @@ async def send(cid: str, body: MessageIn):
                     break
             finished = True
             clean = TAG_RE.sub("", full).strip()
+            suggestions = []
             for raw in TAG_RE.findall(full):
                 try:
                     m = json.loads(raw)
-                    yield _sse({"type": "memory_suggestion", "kind": m.get("kind") if m.get("kind") in KINDS else "fact", "text": str(m.get("text", ""))[:500]})
+                    suggestions.append({"kind": m.get("kind") if m.get("kind") in KINDS else "fact", "text": str(m.get("text", ""))[:500]})
                 except json.JSONDecodeError:
                     pass
-            await save(clean)
+            for s in suggestions:
+                yield _sse({"type": "memory_suggestion", **s})
+            await save(clean, suggestions=suggestions)
             yield _sse({"type": "done", "text": clean})
         except Exception:
             logger.exception("manager stream failed")
@@ -229,7 +232,12 @@ async def list_memory():
 
 @router.post("/memory")
 async def add_memory(body: MemoryIn):
-    doc = {"kind": body.kind if body.kind in KINDS else "fact", "text": body.text.strip(), "created_at": now_iso(), "updated_at": now_iso()}
+    kind = body.kind if body.kind in KINDS else "fact"
+    existing = await tdb.manager_memory.find_one({"text": body.text.strip()}, {"_id": 1})
+    if existing:
+        await tdb.manager_memory.update_one({"_id": existing["_id"]}, {"$set": {"kind": kind, "updated_at": now_iso()}})
+        return {"id": str(existing["_id"]), "existing": True}
+    doc = {"kind": kind, "text": body.text.strip(), "created_at": now_iso(), "updated_at": now_iso()}
     return {"id": str((await tdb.manager_memory.insert_one(doc)).inserted_id)}
 
 
@@ -243,7 +251,9 @@ async def edit_memory(mid: str, body: MemoryIn):
 
 @router.delete("/memory/{mid}")
 async def delete_memory(mid: str):
-    await tdb.manager_memory.delete_one({"_id": oid(mid)})
+    res = await tdb.manager_memory.delete_one({"_id": oid(mid)})
+    if not res.deleted_count:
+        raise HTTPException(404, "Memory item not found")
     return {"ok": True}
 
 

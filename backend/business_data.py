@@ -80,7 +80,7 @@ async def snapshot() -> dict:
                                            "$or": [{"balance_due": {"$gt": 0}}, {"payment_status": {"$in": ["pending", "failed"]}}]}, {"timeline": 0}).to_list(200)
     leads_all = await tdb.leads.find(LIVE, {"timeline": 0}).to_list(5000)
     converted = [l for l in leads_all if l.get("status") in ("booked", "completed")]
-    plans = await tdb.recurring_plans.find({"status": {"$in": ["active", "needs_card", "paused"]}}).to_list(500)
+    plans = await tdb.recurring_plans.find({**LIVE, "status": {"$in": ["active", "needs_card", "paused"]}}).to_list(500)
     reviews = await tdb.reviews.find(LIVE).to_list(1000)
     approved = [r for r in reviews if r.get("status") in ("approved", "responded")]
     staff = await db.users.count_documents({"company_id": current_company.get()["id"], "role": "staff", "active": {"$ne": False}})

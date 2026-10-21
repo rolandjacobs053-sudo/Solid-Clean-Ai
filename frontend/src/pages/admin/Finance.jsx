@@ -7,10 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Empty, Kpi, PageHeader, Panel, useLoad } from "@/components/admin/ui";
 import { api, errMsg, fmtDate, gbp, label } from "@/lib/api";
 
-const thisMonth = () => new Date().toISOString().slice(0, 7);
+const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+const thisMonth = () => today().slice(0, 7);
 
 const ExpenseForm = ({ categories, onAdded }) => {
-  const [v, setV] = useState({ date: new Date().toISOString().slice(0, 10), category: "supplies", amount: "", description: "" });
+  const [v, setV] = useState({ date: today(), category: "supplies", amount: "", description: "" });
   const add = async () => {
     try { await api.post("/admin/finance/expenses", { ...v, amount: Number(v.amount) }); setV({ ...v, amount: "", description: "" }); onAdded(); toast.success("Expense recorded"); } catch (e) { toast.error(errMsg(e)); }
   };
@@ -51,7 +52,7 @@ export default function Finance() {
   const [jobs, reloadJobs] = useLoad("/admin/finance/jobs", { month });
   const reload = () => { reloadSum(); reloadExp(); reloadJobs(); };
   const m = sum?.metrics;
-  const del = async (id) => { await api.delete(`/admin/finance/expenses/${id}`); reload(); };
+  const del = async (id) => { try { await api.delete(`/admin/finance/expenses/${id}`); toast.success("Expense deleted"); } catch (e) { toast.error(errMsg(e)); } reload(); };
   return (
     <div data-testid="finance-page">
       <PageHeader eyebrow="Private · owner only" title="Expenses & profit" desc="Record expenses and the cost of each job so revenue and profit are calculated from real figures. Demo records are excluded from totals.">

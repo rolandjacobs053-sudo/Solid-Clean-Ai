@@ -28,7 +28,7 @@ export const MemoryPanel = () => {
   const [editing, setEditing] = useState(null);
   const add = async (v, reset) => { try { await api.post("/admin/manager/memory", v); reset(); reload(); toast.success("Saved to business memory"); } catch (e) { toast.error(errMsg(e)); } };
   const edit = async (id, v) => { try { await api.put(`/admin/manager/memory/${id}`, v); setEditing(null); reload(); toast.success("Memory updated"); } catch (e) { toast.error(errMsg(e)); } };
-  const del = async (id) => { await api.delete(`/admin/manager/memory/${id}`); reload(); };
+  const del = async (id) => { try { await api.delete(`/admin/manager/memory/${id}`); toast.success("Removed from memory"); } catch (e) { toast.error(errMsg(e)); } reload(); };
   return (
     <div className="max-w-3xl" data-testid="manager-memory">
       <p className="mb-4 text-sm text-slate-600">Targets, decisions, projects and facts the Business Manager uses in every conversation. Correct or delete anything outdated. This is private and never shared with the customer chat on your website.</p>
