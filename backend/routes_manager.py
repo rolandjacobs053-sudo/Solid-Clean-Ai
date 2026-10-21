@@ -36,6 +36,15 @@ HARD RULES
 <<REMEMBER {{"kind":"target|fact|decision|project|preference","text":"one concise sentence"}}>>
 The owner then chooses whether to save it. Never mention the tag.
 {voice}
+GROWTH CONTEXT: Long-term ambition: £400m annual revenue OR £400m valuation (explain the difference when relevant: valuation = profit/EBITDA x a multiple; state the multiple as an assumption). Think like an experienced cleaning-industry entrepreneur, strategist, financial analyst, marketing director, operations manager and technology leader. Explain your reasoning and uncertainty. Prioritise actions that generate revenue, improve profit, build recurring contracts, create systems and increase company value.
+CURRENT ROADMAP: {roadmap}
+GOALS & PROGRESS (actual): {goals}
+ALERTS DETECTED FROM DATA: {alerts}
+DRAFTS WAITING FOR OWNER APPROVAL: {approvals} (in the Approvals tab - you cannot send them)
+
+INDUSTRY KNOWLEDGE BASE (lessons retrieved from sources the owner's system has actually read; cite as 'per <source_title>' and respect evidence_level: verified/reported = sourced fact, claim/opinion = unproven). If the knowledge base has nothing relevant, say you're using general business knowledge and label it as such. Never claim to have read sources that are not listed here:
+{knowledge}
+
 BUSINESS MEMORY (saved by the owner; newest first):
 {memory}
 
@@ -88,10 +97,19 @@ async def _memory_text() -> str:
     return "\n".join(f"- [{m['kind']}] {m['text']} (saved {m['updated_at'][:10]})" for m in mem) or "(nothing saved yet)"
 
 
-async def _context() -> dict:
+async def _context(question: str = "") -> dict:
+    from business_data import insights
+    from routes_knowledge import relevant
+    from routes_strategy import goals_with_progress
     s = await tdb.settings.find_one({}, {"business": 1})
     snap = await snapshot()
-    return {"biz": s["business"]["name"], "data": json.dumps(snap, default=str), "memory": await _memory_text(), "today": snap["today"]}
+    rm = await tdb.roadmaps.find_one({}, {"current_stage": 1, "current_position": 1, "next_90_days": 1, "stages.n": 1, "stages.name": 1, "created_at": 1}, sort=[("created_at", -1)])
+    roadmap = json.dumps({k: rm[k] for k in ("current_stage", "current_position", "next_90_days", "stages", "created_at") if k in rm}, default=str) if rm else "(not generated yet - owner can generate it in the Roadmap tab)"
+    goals = [{k: g[k] for k in ("title", "current", "target", "progress_pct")} for g in await goals_with_progress(snap)]
+    know = await relevant(question, 8) if question else []
+    return {"biz": s["business"]["name"], "data": json.dumps(snap, default=str), "memory": await _memory_text(), "today": snap["today"], "roadmap": roadmap,
+            "goals": json.dumps(goals), "alerts": json.dumps(insights(snap)), "approvals": await tdb.approvals.count_documents({"status": "pending"}),
+            "knowledge": json.dumps(know) if know else "(no relevant lessons stored)"}
 
 
 @router.get("/chats")
@@ -130,7 +148,7 @@ async def delete_chat(cid: str):
 @router.post("/chats/{cid}/messages")
 async def send(cid: str, body: MessageIn):
     conv = await _chat(cid)
-    ctx = await _context()
+    ctx = await _context(body.text + " " + " ".join(m["text"] for m in conv["messages"][-2:] if m["role"] == "user"))
     titles = [c["title"] for c in await tdb.manager_chats.find({"_id": {"$ne": oid(cid)}}, {"title": 1}).sort("updated_at", -1).to_list(5)]
     transcript = "\n".join(f"{m['role'].upper()}: {m['text']}" for m in conv["messages"][-30:]) or "(new conversation)"
     system = SYSTEM.format(**ctx, voice=VOICE_NOTE if body.via == "voice" else "", titles=", ".join(titles) or "(none)", transcript=transcript)
@@ -270,6 +288,9 @@ Avoid repeating these recently dismissed or completed actions: {avoid}
 MEMORY:
 {memory}
 
+GOALS: {goals}
+ALERTS: {alerts}
+
 DATA ({today}):
 {data}"""
 
@@ -292,7 +313,7 @@ async def generate_priorities():
     ctx = await _context()
     avoid = [p["title"] for p in await tdb.priorities.find({"status": {"$in": ["dismissed", "completed"]}}).sort("created_at", -1).to_list(15)]
     try:
-        raw = await ai_complete(PRIORITY_SYSTEM.format(**ctx, avoid=", ".join(avoid) or "(none)"), "Give my top 3 business priorities now.")
+        raw = await ai_complete(PRIORITY_SYSTEM.format(**ctx, avoid=", ".join(avoid) or "(none)"), "Give my top 3 business priorities now, taking the ALERTS and GOALS into account.")
         items = _json(raw, "[")[:3]
     except Exception:
         logger.exception("priorities failed")

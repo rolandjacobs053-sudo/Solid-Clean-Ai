@@ -7,3 +7,17 @@ crons:
     method: POST
     # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
     enabled: true
+  - name: manager-daily-brief
+    description: "AI Business Manager daily brief saved to the dashboard Reports tab"
+    cron: "30 6 * * *"
+    timezone: "Europe/London"
+    endpoint: "{{BASE_URL}}/api/cron/manager-report/daily"
+    method: POST
+    enabled: true
+  - name: manager-weekly-review
+    description: "AI Business Manager weekly review every Monday, saved to the dashboard Reports tab"
+    cron: "0 7 * * 1"
+    timezone: "Europe/London"
+    endpoint: "{{BASE_URL}}/api/cron/manager-report/weekly"
+    method: POST
+    enabled: true

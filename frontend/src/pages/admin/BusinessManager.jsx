@@ -10,11 +10,16 @@ import { ChatThread } from "@/components/manager/ChatThread";
 import { Composer } from "@/components/manager/Composer";
 import { MemoryPanel } from "@/components/manager/MemoryPanel";
 import { Priorities } from "@/components/manager/Priorities";
+import { Alerts } from "@/components/manager/Alerts";
+import { Approvals } from "@/components/manager/Approvals";
+import { GrowthPlan } from "@/components/manager/GrowthPlan";
+import { Knowledge } from "@/components/manager/Knowledge";
+import { Reports } from "@/components/manager/Reports";
 import { useManagerChat } from "@/hooks/useManagerChat";
 import { useVoice, voiceSupport } from "@/hooks/useVoice";
 import { api, errMsg } from "@/lib/api";
 
-const STARTERS = ["What should I focus on today?", "What are the biggest problems in my business right now?", "How can I get more customers this week?", "How far am I from £10,000 monthly profit?", "Which services are most profitable?", "What tasks can I automate?"];
+const STARTERS = ["What should I focus on this week?", "What is preventing my business from growing?", "How can I win 10 new commercial cleaning contracts?", "How far am I from £10,000 monthly profit?", "When should I hire another cleaner or a manager?", "How can I stop doing the cleaning myself?"];
 
 function Assistant() {
   const [chats, setChats] = useState(null);
@@ -62,6 +67,7 @@ function Assistant() {
         <div className="flex-1 pb-4">
           {chat.messages.length === 0 ? (
             <div className="py-6" data-testid="manager-empty-state">
+              <Alerts />
               <p className="font-display text-xl font-semibold text-slate-900">Hello - I'm your Business Manager.</p>
               <p className="mt-1 max-w-xl text-sm text-slate-500">I read your live bookings, enquiries, regular clients, reviews, costs and memory. I'll tell you what's actual, what's estimated and what's missing. Type or tap the mic.</p>
               <div className="mt-5 grid gap-2 sm:grid-cols-2">{STARTERS.map((s, i) => <button key={s} onClick={() => send(s)} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:border-[#8F7E22]" data-testid={`manager-starter-${i}`}>{s}</button>)}</div>
@@ -90,10 +96,18 @@ export default function BusinessManager() {
         <TabsList className="mb-6 h-auto w-full justify-start overflow-x-auto sm:w-auto">
           <TabsTrigger value="assistant" data-testid="manager-tab-assistant">Assistant</TabsTrigger>
           <TabsTrigger value="priorities" data-testid="manager-tab-priorities">My Business Priorities</TabsTrigger>
+          <TabsTrigger value="growth" data-testid="manager-tab-growth">Goals & Roadmap</TabsTrigger>
+          <TabsTrigger value="reports" data-testid="manager-tab-reports">Reports</TabsTrigger>
+          <TabsTrigger value="approvals" data-testid="manager-tab-approvals">Approvals</TabsTrigger>
+          <TabsTrigger value="knowledge" data-testid="manager-tab-knowledge">Industry knowledge</TabsTrigger>
           <TabsTrigger value="memory" data-testid="manager-tab-memory">Business memory</TabsTrigger>
         </TabsList>
         <TabsContent value="assistant"><Assistant /></TabsContent>
         <TabsContent value="priorities"><Priorities /></TabsContent>
+        <TabsContent value="growth"><GrowthPlan /></TabsContent>
+        <TabsContent value="reports"><Reports /></TabsContent>
+        <TabsContent value="approvals"><Approvals /></TabsContent>
+        <TabsContent value="knowledge"><Knowledge /></TabsContent>
         <TabsContent value="memory"><MemoryPanel /></TabsContent>
       </Tabs>
     </div>

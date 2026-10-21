@@ -51,6 +51,8 @@ import { AboutPage, AreasPage, ContactPage, FaqPage, HomePage, PolicyPage, Revie
 import Policies from "@/pages/admin/Policies";
 import BusinessManager from "@/pages/admin/BusinessManager";
 import Finance from "@/pages/admin/Finance";
+import Customers from "@/pages/admin/Customers";
+import CustomerDetail from "@/pages/admin/CustomerDetail";
 import PublicPolicies from "@/pages/PublicPolicies";
 
 function BookingLayout() {
@@ -151,6 +153,8 @@ function App() {
               <Route path="regular-clients" element={<RegularClients />} />
               <Route path="business-manager" element={<BusinessManager />} />
               <Route path="finance" element={<Finance />} />
+              <Route path="customers" element={<Customers />} />
+              <Route path="customers/:id" element={<CustomerDetail />} />
               <Route path="receptionist" element={<Conversations />} />
               <Route path="outreach" element={<Outreach />} />
               <Route path="reviews" element={<Reviews />} />
