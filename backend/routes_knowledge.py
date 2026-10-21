@@ -230,7 +230,7 @@ async def stats():
     count = lambda k: {v: len([i for i in items if i.get(k) == v]) for v in {i.get(k) for i in items}}  # noqa: E731
     return {"lessons": len(items), "sources": len({i.get("source_url") or i.get("source_title") for i in items}), "by_topic": count("topic"),
             "by_source_type": count("source_type"), "by_evidence": count("evidence_level"), "outdated": len([i for i in items if i["status"] == "outdated"]),
-            "topics": TOPICS, "source_types": SOURCE_TYPES, "live_web_research": "Perplexity connected" if os.environ.get("PERPLEXITY_API_KEY") else "not connected - add a Perplexity API key"}
+            "topics": TOPICS, "source_types": SOURCE_TYPES, "live_web_research": "Perplexity connected" if os.environ.get("PERPLEXITY_API_KEY") else "free web search connected"}
 
 
 @router.patch("/{kid}")

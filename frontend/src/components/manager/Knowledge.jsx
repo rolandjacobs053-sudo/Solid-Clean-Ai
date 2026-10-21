@@ -74,7 +74,7 @@ const Research = ({ onDone }) => {
   };
   if (!st) return null;
   return (
-    <Panel title="Live web research (Perplexity)">
+    <Panel title={`Live web research (${st.provider})`}>
       <div data-testid="knowledge-research-panel">
         {!st.connected ? (
           <p className="text-sm text-amber-800" data-testid="research-not-connected">Not connected yet. Create an API key at perplexity.ai/settings/api (pay-as-you-go, typically a few pence per search) and send it to me - it's stored only on the server. Until then, add sources by link or pasted text above.</p>

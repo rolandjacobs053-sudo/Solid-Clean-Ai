@@ -201,7 +201,7 @@ async def send(cid: str, body: MessageIn):
         try:
             r = await web_research(body.text, "chat")
             src = "\n".join(f"[{i + 1}] {s['title']} - {s['url']}" for i, s in enumerate(r["sources"]))
-            system += f"\n\nLIVE WEB RESEARCH just run for this question (Perplexity). Use it, cite as [n] with the site name, and separate sourced facts from your own analysis:\n{r['answer'][:6000]}\nSOURCES:\n{src}"
+            system += f"\n\nLIVE WEB RESEARCH just run for this question. Use it, cite as [n] with the site name, and separate sourced facts from your own analysis:\n{r['answer'][:6000]}\nSOURCES:\n{src}"
         except HTTPException as e:
             system += f"\n\nThe owner asked for a live web search but it was not run: {e.detail}. Tell them this briefly, then answer from the knowledge base and data."
     first = not conv["messages"]

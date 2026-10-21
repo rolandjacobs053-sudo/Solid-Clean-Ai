@@ -108,3 +108,13 @@ Earlier history: started as an integrated Solid Clean system, then a multi-tenan
 - TTS prefs (manager_prefs): default tts-1-hd, voice sage, speed 1.0; GET/PUT /api/admin/manager/prefs; /speak uses prefs (optional voice override). UI: model select + "Voice" popover (quality, voice, speed, preview); "Listen" on reports (chunked ~3500 chars, stop).
 - Verified via curl (Haiku + Opus chats stream, HD speak 200) and mobile screenshot. Not yet published. Perplexity key still not provided.
 
+
+## 2026-10-21 - Free web research (no key needed) + publish
+- Owner chose a free option instead of a Perplexity key. research.py: if PERPLEXITY_API_KEY unset -> free mode: DuckDuckGo search (ddgs pkg, region uk-en, 8 results) + reads top 4 pages via routes_knowledge.fetch_source (SSRF-guarded) + Claude Sonnet 5.5 writes a cited [n] briefing. Perplexity is used automatically if a key is added later.
+- connected() now always True; status.provider = "Free web search" | "Perplexity". Same 20/week cap. Weekly Monday research cron now active.
+- Verified via curl: chat web=true returned cited London EoT prices; "Research now" job added 6 lessons from 8 sources (test data then deleted). Screenshot desktop+mobile: switch enabled "Search the web (20 left this week)".
+- Re-publish dispatched 2026-10-21 (model picker, HD voice, Listen button, free web research).
+
+## Backlog
+- P0 Contract generation & e-signatures. P1 Congestion/ULEZ/travel cost calculator. P2 Google Reviews (needs Places key), Twilio phone receptionist (needs credentials). Optional: Perplexity key for deeper research.
+

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from datetime import timedelta
@@ -21,8 +22,16 @@ TOPICS = [
 ]
 
 
-def connected() -> bool:
+def perplexity() -> bool:
     return bool(os.environ.get("PERPLEXITY_API_KEY"))
+
+
+def connected() -> bool:
+    return True
+
+
+def provider() -> str:
+    return "Perplexity" if perplexity() else "Free web search"
 
 
 async def used_this_week() -> int:
@@ -31,7 +40,7 @@ async def used_this_week() -> int:
 
 async def status() -> dict:
     used = await used_this_week()
-    return {"provider": "Perplexity", "connected": connected(), "weekly_cap": WEEKLY_CAP, "used_this_week": used, "remaining": max(0, WEEKLY_CAP - used), "topics": TOPICS,
+    return {"provider": provider(), "connected": connected(), "weekly_cap": WEEKLY_CAP, "used_this_week": used, "remaining": max(0, WEEKLY_CAP - used), "topics": TOPICS,
             "last": [{k: r.get(k) for k in ("query", "created_at", "sources_count", "trigger")} for r in await tdb.research_log.find({}).sort("created_at", -1).to_list(10)]}
 
 
@@ -51,13 +60,46 @@ def _parse(raw: dict) -> tuple[str, list]:
     return text.strip(), sources[:12]
 
 
+FREE_SYSTEM = ("You are a research analyst. Using ONLY the numbered web results provided, write a factual briefing that answers the question. "
+               "Cite every fact as [n]. Give specific figures, dates and named companies where the sources have them. "
+               "Say clearly when sources disagree, are thin, or are just a company's own marketing claims. Never invent facts or sources.")
+
+
+async def _free(query: str, prompt: str) -> tuple[str, list]:
+    from ddgs import DDGS
+    from ai import ai_complete
+    from routes_knowledge import fetch_source
+    try:
+        hits = await asyncio.to_thread(lambda: DDGS().text(query[:250], region="uk-en", max_results=8))
+    except Exception:
+        logger.warning("free search failed", exc_info=True)
+        raise HTTPException(502, "The web search didn't respond. Please try again in a minute.")
+    hits = [h for h in hits or [] if h.get("href")]
+    if not hits:
+        raise HTTPException(502, "The web search found nothing for that question - try rewording it.")
+
+    async def page(h):
+        try:
+            return (await asyncio.wait_for(fetch_source(h["href"]), 20))[1][:3000]
+        except Exception:
+            return ""
+    pages = await asyncio.gather(*[page(h) for h in hits[:4]])
+    sources = [{"url": h["href"], "title": h.get("title") or h["href"], "date": None} for h in hits]
+    blocks = "\n\n".join(f"[{i + 1}] {h.get('title')} - {h['href']}\nSnippet: {h.get('body', '')}" + (f"\nPage text: {pages[i]}" if i < len(pages) and pages[i] else "")
+                         for i, h in enumerate(hits))
+    text = await ai_complete(FREE_SYSTEM, f"QUESTION: {prompt}\n\nWEB RESULTS:\n{blocks}")
+    return text, sources
+
+
 async def web_research(query: str, trigger: str) -> dict:
-    if not connected():
-        raise HTTPException(409, "Live web research isn't connected yet - add your Perplexity API key to switch it on.")
     if await used_this_week() >= WEEKLY_CAP:
         raise HTTPException(429, f"This week's research limit ({WEEKLY_CAP} searches) has been reached, to keep costs under control.")
     prompt = (f"{query}\n\nFocus on credible, recent sources (official reports, company filings, reputable press, industry bodies). "
               "Give specific facts with figures and dates, name the companies/people involved, and say when evidence is weak or a claim is unverified.")
+    if not perplexity():
+        text, sources = await _free(query, prompt)
+        await tdb.research_log.insert_one({"query": query[:300], "trigger": trigger, "sources_count": len(sources), "provider": "free", "created_at": now_iso()})
+        return {"answer": text, "sources": sources}
     headers = {"Authorization": f"Bearer {os.environ['PERPLEXITY_API_KEY']}", "Content-Type": "application/json"}
     try:
         async with httpx.AsyncClient(base_url="https://api.perplexity.ai", timeout=httpx.Timeout(90, connect=10), headers=headers) as c:
