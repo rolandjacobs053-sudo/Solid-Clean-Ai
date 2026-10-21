@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -12,7 +13,7 @@ CATEGORIES = ("cleaner_wages", "subcontractors", "supplies", "equipment", "fuel_
 
 
 def _month(month: str) -> str:
-    return month or now().strftime("%Y-%m")
+    return month or now().astimezone(ZoneInfo("Europe/London")).strftime("%Y-%m")
 
 
 class ExpenseIn(BaseModel):

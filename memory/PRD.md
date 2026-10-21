@@ -75,3 +75,12 @@ Earlier history: started as an integrated Solid Clean system, then a multi-tenan
 - If a custom domain (solidcleanltd.com) is connected later, update SITE in SeoManager.jsx, index.html, sitemap.xml and robots.txt.
 
 
+## 2026-10-21 - AI Business Manager (owner only)
+- User master prompt: "SOLID CLEAN AI — BUSINESS MANAGEMENT AND GROWTH ASSISTANT" (text + voice AI business partner, priorities, memory, finance, strict approval rules, no invented figures).
+- Choices: Claude Sonnet 5.5 (Universal Key); OpenAI Whisper STT + OpenAI TTS tts-1 voice "sage" (Universal Key, usage-billed); Expenses page + per-job costs; owner only (default); preview only, not published.
+- Backend: business_data.py (snapshot + month_metrics, excludes demo, London date), routes_manager.py (/api/admin/manager: chats CRUD/search, SSE messages w/ stop + saved partials, REMEMBER suggestions persisted, transcribe, speak, memory CRUD w/ dedupe, priorities generate/patch/plan, snapshot), routes_finance.py (/api/admin/finance: summary+trend, expenses CRUD, jobs, per-job costs). All require_owner.
+- Frontend: /admin/business-manager (Assistant / My Business Priorities / Business memory tabs), hooks useVoice (MediaRecorder + silence auto-stop, hands-free, iOS audio unlock) & useManagerChat (fetch SSE + AbortController), components/manager/*, /admin/finance page. Nav items owner-only.
+- Tested: iteration_14 (27 backend tests pass, full UI incl. voice loop with injected speech, mobile). Follow-up fixes: demo filter on escalations/carpet/walkthroughs, quotes split into contactable vs anonymous price checks, mobile tabs scroll, voice "thinking" state, chat delete error handling.
+- Known: Overview dashboard counts demo records while Manager/Finance exclude them. No Google Business Profile / Search Console / Ads / accounting data connected.
+
+

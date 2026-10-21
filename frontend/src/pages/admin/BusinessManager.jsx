@@ -47,7 +47,11 @@ function Assistant() {
     voice.start(true);
   };
   const remember = async (s, i, k) => { try { await api.post("/admin/manager/memory", { kind: s.kind, text: s.text }); setSaved((x) => new Set(x).add(`${i}-${k}`)); toast.success("Saved to business memory"); } catch (e) { toast.error(errMsg(e)); } };
-  const del = async () => { await api.delete(`/admin/manager/chats/${toDelete.id}`); if (toDelete.id === chat.chatId) chat.open(null); setToDelete(null); loadChats(); toast.success("Conversation deleted"); };
+  const del = async () => {
+    try { await api.delete(`/admin/manager/chats/${toDelete.id}`); if (toDelete.id === chat.chatId) chat.open(null); toast.success("Conversation deleted"); } catch (e) { toast.error(errMsg(e)); }
+    setToDelete(null);
+    loadChats();
+  };
   const list = <ChatList chats={chats} activeId={chat.chatId} onOpen={open} onNew={() => open(null)} onDelete={setToDelete} onSearch={(q) => { setQuery(q); loadChats(q); }} />;
 
   return (
@@ -65,8 +69,8 @@ function Assistant() {
           ) : <ChatThread messages={chat.messages} onSpeak={(t) => { voice.unlock(); voice.speak(t); }} onRemember={remember} saved={saved} />}
           <div ref={endRef} />
         </div>
-        <Composer busy={chat.busy} voice={voice} support={support} handsFree={handsFree} setHandsFree={setHandsFree} onSend={send}
-          onStop={() => { chat.stop(); voice.stopSpeaking(); }} onMic={mic} onVoiceStop={() => (voice.state === "speaking" ? voice.stopSpeaking() : voice.stop(true))} />
+        <Composer busy={chat.busy} thinking={chat.busy && chat.messages[chat.messages.length - 1]?.via === "voice"} voice={voice} support={support} handsFree={handsFree} setHandsFree={setHandsFree} onSend={send}
+          onStop={() => { chat.stop(); voice.stopSpeaking(); }} onMic={mic} onVoiceStop={() => (voice.state === "speaking" ? voice.stopSpeaking() : voice.state === "idle" ? chat.stop() : voice.stop(true))} />
       </section>
       <Sheet open={sheet} onOpenChange={setSheet}><SheetContent side="left" className="w-[85vw] max-w-sm"><SheetHeader><SheetTitle>Conversations</SheetTitle></SheetHeader><div className="mt-4 h-[80vh]">{list}</div></SheetContent></Sheet>
       <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
@@ -83,7 +87,7 @@ export default function BusinessManager() {
     <div data-testid="business-manager-page">
       <PageHeader eyebrow="Private · owner only" title="AI Business Manager" desc="Your business partner for operations, growth, marketing and finance - powered by your real dashboard data." />
       <Tabs defaultValue="assistant">
-        <TabsList className="mb-6 flex-wrap">
+        <TabsList className="mb-6 h-auto w-full justify-start overflow-x-auto sm:w-auto">
           <TabsTrigger value="assistant" data-testid="manager-tab-assistant">Assistant</TabsTrigger>
           <TabsTrigger value="priorities" data-testid="manager-tab-priorities">My Business Priorities</TabsTrigger>
           <TabsTrigger value="memory" data-testid="manager-tab-memory">Business memory</TabsTrigger>

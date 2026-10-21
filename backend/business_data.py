@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from zoneinfo import ZoneInfo
 
 from core import current_company, db, now, tdb
 
@@ -70,7 +71,7 @@ def _count(docs):
 
 
 async def snapshot() -> dict:
-    today = now().date()
+    today = now().astimezone(ZoneInfo("Europe/London")).date()
     ym = today.strftime("%Y-%m")
     last = (today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
     in14 = (today + timedelta(days=14)).isoformat()
@@ -89,18 +90,19 @@ async def snapshot() -> dict:
         sources[l.get("source") or "other"] = sources.get(l.get("source") or "other", 0) + 1
     return {
         "today": t,
-        "data_note": "Figures exclude records tagged as demo. Revenue = value of paid confirmed/completed jobs dated in the month. Profit = revenue - recorded job costs - recorded expenses - recorded marketing spend.",
+        "data_note": "Figures exclude records tagged as demo. Revenue = value of paid confirmed/completed jobs dated in the month. Profit = revenue - recorded job costs - recorded expenses - recorded marketing spend. Anonymous website price checks are visitors who saw an instant price without leaving contact details - they cannot be followed up.",
         "demo_records_present": await tdb.bookings.count_documents({"demo": True}) + await tdb.leads.count_documents({"demo": True}),
         "this_month": await month_metrics(ym), "last_month": await month_metrics(last),
         "all_time": {"enquiries": len(leads_all), "converted_enquiries": len(converted),
                      "enquiry_to_booking_conversion_pct": round(len(converted) / len(leads_all) * 100, 1) if leads_all else None,
                      "enquiries_by_source": sources,
                      "open_enquiries_not_contacted": len([l for l in leads_all if l.get("status") == "new"])},
-        "quotes_awaiting_customer": await tdb.quotes.count_documents({**LIVE, "status": "sent"}),
-        "carpet_quotes_awaiting_admin": await tdb.carpet_quotes.count_documents({"status": "awaiting_review"}),
-        "walkthrough_requests_open": await tdb.walkthroughs.count_documents({"status": "requested"}),
+        "quotes_sent_to_contactable_enquiries": await tdb.quotes.count_documents({**LIVE, "status": "sent", "lead_id": {"$ne": None}}),
+        "anonymous_website_price_checks": await tdb.quotes.count_documents({**LIVE, "lead_id": None}),
+        "carpet_quotes_awaiting_admin": await tdb.carpet_quotes.count_documents({**LIVE, "status": "awaiting_review"}),
+        "walkthrough_requests_open": await tdb.walkthroughs.count_documents({**LIVE, "status": "requested"}),
         "follow_ups_overdue": await tdb.leads.count_documents({**LIVE, "follow_up_date": {"$ne": None, "$lt": t}, "status": {"$nin": ["completed", "lost"]}}),
-        "customer_escalations_open": await tdb.conversations.count_documents({"escalated": True, "status": "needs_human"}),
+        "customer_escalations_open": await tdb.conversations.count_documents({**LIVE, "escalated": True, "status": "needs_human"}),
         "upcoming_jobs_14_days": [{"date": b["date"], "slot": b.get("slot"), "service": b.get("service_name"), "postcode": b.get("postcode"),
                                    "total": b.get("total"), "assigned_to": b.get("assigned_name")} for b in upcoming],
         "upcoming_jobs_unassigned": len([b for b in upcoming if not b.get("assigned_to")]),

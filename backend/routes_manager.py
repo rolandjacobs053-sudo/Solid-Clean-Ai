@@ -187,7 +187,8 @@ async def transcribe(file: UploadFile = File(...)):
         raise HTTPException(400, "Recording was too short - please hold the mic a little longer.")
     if len(data) > 24 * 1024 * 1024:
         raise HTTPException(400, "Recording is too long - please keep voice messages under a few minutes.")
-    ext = "mp4" if "mp4" in (file.content_type or "") or (file.filename or "").endswith((".mp4", ".m4a")) else "webm"
+    ct, fn = (file.content_type or "").lower(), (file.filename or "").lower()
+    ext = next((e for e, keys in (("mp4", ("mp4", "m4a", "aac")), ("mp3", ("mpeg", "mp3")), ("wav", ("wav",)), ("ogg", ("ogg",))) if any(k in ct or fn.endswith(k) for k in keys)), "webm")
     buf = io.BytesIO(data)
     buf.name = f"speech.{ext}"
     try:

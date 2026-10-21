@@ -48,6 +48,10 @@ def created():
     return {"chats": [], "memory": [], "expenses": []}
 
 
+def _db():
+    return MongoClient(os.environ.get("MONGO_URL", "mongodb://localhost:27017"))[os.environ.get("DB_NAME", "test_database")]
+
+
 @pytest.fixture(scope="module", autouse=True)
 def cleanup(created):
     yield
@@ -58,6 +62,10 @@ def cleanup(created):
         s.delete(f"{BASE_URL}/api/admin/manager/memory/{m}")
     for e in created["expenses"]:
         s.delete(f"{BASE_URL}/api/admin/finance/expenses/{e}")
+    d = _db()
+    d.users.delete_many({"email": STAFF["email"]})
+    d.priorities.delete_many({})  # no priorities existed before this suite (no delete API)
+    d.manager_memory.delete_many({"text": {"$regex": "^TEST_|10,000 monthly profit by December 2027"}})
 
 
 # Auth: owner-only
@@ -129,6 +137,9 @@ class TestChat:
         print("SUGG:", sugg)
         assert sugg, "no memory_suggestion event"
         assert "<<REMEMBER" not in ev[-1]["text"]
+        msg = owner.get(f"{BASE_URL}/api/admin/manager/chats/{cid}").json()["messages"][1]
+        assert msg.get("suggestions") and msg["suggestions"][0]["text"] == sugg[0]["text"], msg
+        assert "<<REMEMBER" not in msg["text"]
 
     def test_delete_chat_404(self, owner):
         cid = owner.post(f"{BASE_URL}/api/admin/manager/chats", json={}).json()["id"]
@@ -149,14 +160,20 @@ class TestMemory:
         r = owner.post(f"{BASE_URL}/api/admin/manager/memory", json={"kind": "target", "text": "TEST_ memory item"})
         mid = r.json()["id"]
         created["memory"].append(mid)
+        # dedupe identical text
+        r2 = owner.post(f"{BASE_URL}/api/admin/manager/memory", json={"kind": "fact", "text": "TEST_ memory item"})
+        assert r2.json()["id"] == mid and r2.json().get("existing") is True
+        assert len([i for i in owner.get(f"{BASE_URL}/api/admin/manager/memory").json() if i["text"] == "TEST_ memory item"]) == 1
         items = owner.get(f"{BASE_URL}/api/admin/manager/memory").json()
-        assert any(i["id"] == mid and i["kind"] == "target" for i in items)
+        assert any(i["id"] == mid and i["kind"] == "fact" for i in items)
         assert owner.put(f"{BASE_URL}/api/admin/manager/memory/{mid}", json={"kind": "bogus", "text": "TEST_ edited"}).status_code == 200
         it = [i for i in owner.get(f"{BASE_URL}/api/admin/manager/memory").json() if i["id"] == mid][0]
         assert it["text"] == "TEST_ edited" and it["kind"] == "fact"
         assert owner.delete(f"{BASE_URL}/api/admin/manager/memory/{mid}").status_code == 200
         assert not any(i["id"] == mid for i in owner.get(f"{BASE_URL}/api/admin/manager/memory").json())
         assert owner.put(f"{BASE_URL}/api/admin/manager/memory/{mid}", json={"kind": "fact", "text": "TEST_ x"}).status_code == 404
+        assert owner.delete(f"{BASE_URL}/api/admin/manager/memory/{mid}").status_code == 404
+        assert owner.delete(f"{BASE_URL}/api/admin/manager/memory/not-an-id").status_code in (400, 404)
 
 
 # Voice
@@ -226,11 +243,37 @@ class TestFinance:
         assert j2["cost_total"] == 48.5
         rev_after = owner.get(f"{BASE_URL}/api/admin/finance/summary", params={"month": ym}).json()["metrics"]
         assert rev_after["job_costs_recorded"] == rev_before["job_costs_recorded"], "demo job cost leaked into KPI"
-        # reset
-        MongoClient(os.environ.get("MONGO_URL", "mongodb://localhost:27017"))  # noqa
+        # reset: restore original state (remove field if it was absent)
         if prev is None:
             from bson import ObjectId
-            import sys
-            sys.path.insert(0, "/app/backend")
-        owner.put(f"{BASE_URL}/api/admin/finance/jobs/{j['id']}/costs", json={"cleaner_pay": 0, "supplies": 0, "travel": 0})
+            _db().bookings.update_one({"_id": ObjectId(j["id"])}, {"$unset": {"job_costs": ""}})
+        else:
+            owner.put(f"{BASE_URL}/api/admin/finance/jobs/{j['id']}/costs", json={k: prev.get(k, 0) for k in ("cleaner_pay", "supplies", "travel")})
         assert owner.put(f"{BASE_URL}/api/admin/finance/jobs/000000000000000000000000/costs", json={}).status_code == 404
+
+
+# Priorities: generate (real LLM), approve/dismiss/complete, plan checklist, checklist toggle
+class TestPriorities:
+    def test_priorities_flow(self, owner):
+        r = owner.post(f"{BASE_URL}/api/admin/manager/priorities/generate", timeout=180)
+        assert r.status_code == 200, r.text
+        items = [p for p in r.json() if p["status"] == "suggested"]
+        print("PRIORITIES:", [(p["title"], p["priority"], p["cost"]) for p in items])
+        assert 1 <= len(items) <= 3
+        assert all(p["priority"] in ("high", "medium", "low") and p["title"] for p in items)
+        pid = items[0]["id"]
+        assert owner.patch(f"{BASE_URL}/api/admin/manager/priorities/{pid}", json={"status": "approved"}).json()["status"] == "approved"
+        if len(items) > 1:
+            assert owner.patch(f"{BASE_URL}/api/admin/manager/priorities/{items[1]['id']}", json={"status": "dismissed"}).json()["status"] == "dismissed"
+        p = owner.post(f"{BASE_URL}/api/admin/manager/priorities/{pid}/plan", timeout=180)
+        assert p.status_code == 200, p.text
+        cl = p.json()["checklist"]
+        print("CHECKLIST:", cl)
+        assert 1 <= len(cl) <= 8 and all(c["done"] is False for c in cl)
+        cl[0]["done"] = True
+        owner.patch(f"{BASE_URL}/api/admin/manager/priorities/{pid}", json={"checklist": cl})
+        got = [x for x in owner.get(f"{BASE_URL}/api/admin/manager/priorities").json() if x["id"] == pid][0]
+        assert got["checklist"][0]["done"] is True and got["checklist"][1]["done"] is False
+        assert owner.patch(f"{BASE_URL}/api/admin/manager/priorities/{pid}", json={"status": "completed"}).json()["status"] == "completed"
+        assert owner.patch(f"{BASE_URL}/api/admin/manager/priorities/000000000000000000000000", json={"status": "approved"}).status_code == 404
+        assert owner.patch(f"{BASE_URL}/api/admin/manager/priorities/{pid}", json={"status": "bogus"}).status_code == 422

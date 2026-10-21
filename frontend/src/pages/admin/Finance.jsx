@@ -61,7 +61,7 @@ export default function Finance() {
       {m && (
         <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
           <Kpi label="Revenue (paid jobs)" value={gbp(m.revenue)} hint={`${m.jobs_booked_or_done} jobs`} testid="finance-kpi-revenue" />
-          <Kpi label="Job costs" value={gbp(m.job_costs_recorded)} hint={m.jobs_missing_costs ? `${m.jobs_missing_costs} jobs not costed` : "all jobs costed"} testid="finance-kpi-jobcosts" />
+          <Kpi label="Job costs" value={gbp(m.job_costs_recorded)} hint={!m.jobs_booked_or_done ? "no jobs" : m.jobs_missing_costs ? `${m.jobs_missing_costs} jobs not costed` : "all jobs costed"} testid="finance-kpi-jobcosts" />
           <Kpi label="Expenses" value={gbp(m.expenses_recorded)} testid="finance-kpi-expenses" />
           <Kpi label="Marketing spend" value={gbp(m.marketing_spend)} testid="finance-kpi-marketing" />
           <Kpi label="Profit" value={gbp(m.profit)} hint={m.profit_status} accent testid="finance-kpi-profit" />

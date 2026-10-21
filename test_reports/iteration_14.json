@@ -1,0 +1,44 @@
+{
+  "summary": "Tested the owner-only AI Business Manager and the Expenses & profit page end to end on preview, against the backend and the UI. I cleaned up the leftover code in test_iter14_business_manager_finance.py, added tests for priorities, memory dedupe, delete-404 and saved suggestions, plus staff/DB cleanup. All 27 backend tests passed with real LLM, STT and TTS calls. UI flows that passed: nav items, starter question with thinking indicator, streamed reply and auto title; follow-up kept its context; stop showed 'Stopped' and the partial reply was saved on reopen; new chat, reopen, search (Enter) and the no-match empty state; delete with confirm dialog; memory suggestion saved, still shown on reopen, and appears in the memory tab; memory add/edit/delete; priorities (3 cards, approve, checklist, check toggle kept after reload, dismiss, complete, history); read aloud plays and stops; finance TEST_ expense add/delete updates KPIs; demo job costs update job-profit and are left out of KPIs; mobile 390x844 (conversations sheet, composer visible, no overflow); regression pages load. Voice UI: with the fake-device Chromium flags the mic opens data-state=listening and Cancel returns to idle. Real speech was fed by replacing getUserMedia with a stream of /speak TTS audio (ffmpeg/WAV wasn't available). The full loop worked: listening -> transcribing -> a 'You said' bubble with an exact transcript -> spoken reply with £0/demo-excluded figures -> speaking -> Stop speaking returns to idle. The AI did not invent figures: it reported £0 and pointed to the 14 excluded demo records. One data bug: the snapshot counts a demo-tagged customer escalation.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "business_data.snapshot (used by chat + /priorities/generate)", "issue": "customer_escalations_open counts demo records: tdb.conversations.count_documents({escalated, needs_human}) has no LIVE filter. The only open escalation in the DB is demo:true (6acb25e09a4ed56aa0a25fd6), yet the AI said '1 customer escalation is open' and made 'Resolve the open customer escalation' a HIGH priority. carpet_quotes_awaiting_admin and walkthrough_requests_open have no demo filter either (currently 0 demo, so no effect yet)."},
+      {"endpoint": "business_data.snapshot quotes_awaiting_customer", "issue": "Reports 3 'sent' quotes that are not demo-tagged (created 2026-10-11/20, most with lead_id null). They look like leftovers from earlier test iterations, and the AI recommends chasing them as real pipeline. The main agent should check whether they are real or should be demo-tagged/removed."},
+      {"endpoint": "POST /api/admin/manager/chats/{id}/messages (stop)", "issue": "After stop, the saved partial (961 chars) is slightly longer than what the user saw (924), because the server keeps streaming until it notices the disconnect. Harmless."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Business Manager mobile 390px", "issues": ["Tabs wrap: 'Business memory' drops to a second line outside the grey TabsList pill. Make the list scroll horizontally or set it to h-auto.", "The composer placeholder is cut off after two lines ('...or tap the')."]},
+      {"screen": "Business Manager voice", "issues": ["Between transcribing and speaking, the voice bar disappears (state idle) while the AI is thinking. A 'thinking' voice state would make hands-free use clearer."]},
+      {"screen": "Finance", "issues": ["The expense date and the month filter use the browser's native date/month pickers instead of the shadcn calendar.", "The Job costs KPI says 'all jobs costed' when there are 0 jobs. It should say 'no jobs'."]},
+      {"screen": "Overview vs AI Manager", "issues": ["The Overview dashboard shows £327 revenue and 6 leads, which include demo records, while the AI Manager and Finance show £0 (demo excluded). The owner may be confused; consider a 'includes demo' label on Overview."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter14_business_manager_finance.py", "/app/test_reports/pytest/pytest_iter14.xml"],
+  "action_items": [
+    "Add the LIVE/demo filter to customer_escalations_open in business_data.snapshot (and to carpet_quotes/walkthroughs for consistency)",
+    "Check the 3 non-demo 'sent' quotes (likely test leftovers) that the AI treats as real pipeline",
+    "Minor UI: mobile tab wrapping; Finance 'all jobs costed' when 0 jobs; optional voice 'thinking' state",
+    "BusinessManager.jsx del(): no try/catch, so a failed chat delete gives an unhandled rejection and no error toast"
+  ],
+  "critical_code_review_comments": [
+    "business_data.py snapshot: customer_escalations_open, carpet_quotes_awaiting_admin and walkthrough_requests_open skip the LIVE filter (the first one has visible impact today)",
+    "BusinessManager.jsx del() has no error handling (unlike the memory/expense deletes)",
+    "routes_manager.transcribe sends mp3 uploads named speech.webm (the extension comes only from an mp4 check). Whisper still transcribed the mp3 correctly in the test, but a wrong extension is fragile.",
+    "routes_finance._month uses now() (server timezone) while the frontend uses London time, so near midnight at a month boundary the default month could differ",
+    "Priorities have no delete endpoint; the suggested ones are replaced on regenerate, but history grows without limit (list capped at 100)",
+    "The login response has access-control-allow-origin: * with allow-credentials: true (probably ingress-level and existing before this work)"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter14_business_manager_finance.py"],
+  "success_rate": {"backend": "100% (27/27)", "frontend": "100% of requested flows passed; 1 data-accuracy bug (demo escalation counted)"},
+  "test_credentials": "Owner admin@solidcleanltd.com / SolidClean#2026 (from /app/memory/test_credentials.md). bcrypt hash starts with $2b$; access_token/refresh_token cookies are set on login.",
+  "seed_data_creation": "None left behind. Deleted from MongoDB: all manager_chats (4 test chats, including the earlier agent's leftover 'TEST_ How much profit...'), priorities (all created by tests; there were 0 before), memory (0 left), TEST_ expenses (0 left), and staff user test_iter14_staff@example.com. job_costs unset on demo booking 6acb25e09a4ed56aa0a25fc4 (it had none before). 7 audit_logs entries (expense.add/delete, job_costs.set) from the tests remain.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: REACT_APP_BACKEND_URL=... pytest backend/tests/test_iter14_business_manager_finance.py (about 30s with xdist; the module fixture cleans up the staff user, priorities and TEST_ memory). Voice UI testing: in browser_automation, launch a second browser with page.context.browser.browser_type.launch(args=[--use-fake-ui-for-media-stream, --use-fake-device-for-media-stream, --autoplay-policy=no-user-gesture-required]). Feed speech with add_init_script that overrides navigator.mediaDevices.getUserMedia to return a MediaStreamDestination playing base64 mp3 from /api/admin/manager/speak. ffmpeg is not installed. All bookings this month are demo-tagged, so revenue is £0.",
+  "rca of the issue": "Demo escalation counted: business_data.snapshot line 'customer_escalations_open': await tdb.conversations.count_documents({'escalated': True, 'status': 'needs_human'}) does not merge LIVE ({'demo': {'$ne': True}}), unlike the other collections. Repro: GET /api/admin/manager/snapshot returns customer_escalations_open=1, while the only matching conversation is demo:true. Fix: {**LIVE, 'escalated': True, 'status': 'needs_human'}."
+}
