@@ -121,7 +121,14 @@ Earlier history: started as an integrated Solid Clean system, then a multi-tenan
 - Login: core.client_ip() takes X-Forwarded-For from the trusted right end (drops LB hop + Cloudflare/private hops); used by login lockout and rate-limit middleware. Added account-level lockout (10 fails/15 min per email) on top of per-IP+email (5). Verified spoofed XFF no longer resets the counter.
 - Deferred (owner's choice): public quote IDOR token, server-side logout revocation, payment status summary exposure.
 
+## 2026-10-21 - Private quote links
+- store_quote now creates a secret token (secrets.token_urlsafe(16)) and returns (id, token). GET /api/public/{slug}/quotes/{id}?t= returns 404 unless the token matches (compare_digest). Owner chose: old links without a token stop working right away (customer sees a fresh quote form).
+- Links: comms.booking_link(request, slug, quote_id, token) -> /c/{slug}/quote?q=&t=. Used by the website quote email, the phone/voice quote email (creates a token if missing) and the AI chat quote card (the event carries the token).
+- Bookings: BookingIn.quote_token. A quote is only reused (status set to booking_started) when the id is valid and the token matches, otherwise a new quote is created. A malformed id falls back safely.
+- Chat widget closes when the page changes, so it no longer hides the quote totals after "Book this quote".
+- Tested: iteration_17 (14/14 backend, frontend flows incl. chat -> private link -> prefill, Stripe checkout regression); re-ran the pytest after the minor fixes, 14 passed.
+
 ## Backlog
-- Security P3 (deferred): per-quote token for public quote lookups, server-side session revocation on logout, trim /api/payments/status response.
+- Security P3 (deferred): server-side session revocation on logout, trim /api/payments/status response.
 - P0 Contract generation & e-signatures. P1 Congestion/ULEZ/travel cost calculator. P2 Google Reviews (needs Places key), Twilio phone receptionist (needs credentials). Optional: Perplexity key for deeper research.
 

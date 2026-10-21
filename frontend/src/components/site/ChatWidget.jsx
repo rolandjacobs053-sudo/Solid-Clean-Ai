@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { MessageCircle, PhoneCall, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import { API, api, errMsg } from "@/lib/api";
@@ -50,6 +51,9 @@ export function ChatWidget() {
   const [busy, setBusy] = useState(false);
   const [escalating, setEscalating] = useState(false);
   const end = useRef(null);
+  const { pathname, search } = useLocation();
+
+  useEffect(() => { setOpen(false); }, [pathname, search]);
 
   useEffect(() => { end.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, escalating]);
 

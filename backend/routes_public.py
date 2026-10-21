@@ -6,6 +6,7 @@ from datetime import timedelta, date
 from typing import Dict, List, Literal, Optional
 
 import stripe
+from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
@@ -316,9 +317,10 @@ async def create_booking(body: BookingIn):
                                 f"Booking started: {result['service_name']} on {fmt_date(body.date)} {body.slot}",
                                 {"marketing_consent": body.contact.marketing_consent})
     lead = await tdb.leads.find_one({"_id": oid(lead_id)})
-    quote_id = body.quote_id if body.quote_id and quote_token_ok(await tdb.quotes.find_one({"_id": oid(body.quote_id)}), body.quote_token) else None
+    ok = body.quote_id and ObjectId.is_valid(body.quote_id) and quote_token_ok(await tdb.quotes.find_one({"_id": ObjectId(body.quote_id)}), body.quote_token)
+    quote_id = body.quote_id if ok else None
     if quote_id:
-        await tdb.quotes.update_one({"_id": oid(quote_id)}, {"$set": {"lead_id": lead_id, "input": q, "result": result, "total": result["total"]}})
+        await tdb.quotes.update_one({"_id": oid(quote_id)}, {"$set": {"lead_id": lead_id, "input": q, "result": result, "total": result["total"], "status": "booking_started"}})
     else:
         quote_id, _ = await store_quote(q, result, lead_id, lead["source"], status="booking_started")
     charge, tip = deposit_for(s, result["total"]), round(body.tip, 2)

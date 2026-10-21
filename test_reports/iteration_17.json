@@ -1,0 +1,35 @@
+{
+  "summary": "Tested the Private Quote Links feature end to end, plus regressions. Everything requested passes. Backend: new file test_iter17_private_quote_links.py, 14/14 pass. POST /quotes returns quote_id and a token of 22 or more characters, and the token is stored on the quote. GET /quotes/{id} gives 404 with no t, with a wrong t, with a truncated t, for a malformed id, and for an old quote saved without a token. It gives 200 with the correct t, and the response contains neither the address nor the token. The quote_sent email in db.communications has link[1] containing ?q=<id>&t=<token>. POST /bookings with the right quote_token reuses the quote: booking.quote_id is the original id, no new quote doc is created, and the quote's lead_id becomes the booking lead. With a wrong or missing quote_token a new quote is created with status booking_started, and the original quote's input, result and status are unchanged. CORS returns the preview origin with credentials=true and does not return evil.example.com. Owner login and /auth/me work. Frontend (Playwright): ?q&t prefills 3 bed 2 bath £109 and opens on step 2 (Property). ?q with no t, and ?q with a wrong t, both show the empty step 1 service picker. AI chat: after 2 turns the assistant produced a chat-quote-card (£87). Clicking chat-quote-book-btn went to /c/solid-clean/quote?q=<id>&t=<token> and prefilled Property with 2 bed, 1 bath, 1 living room, £87. A booking from scratch (End of Tenancy, £240) reached checkout.stripe.com (test). A booking through a private link reached Stripe, the booking's quote_id matched the linked quote, and only 1 quote exists for that lead, so the frontend sends quote_token correctly. Admin login with admin@solidcleanltd.com works via the admin-login-* test ids, and /admin/business-manager loads with no console errors. Auth checks: the bcrypt hash starts with $2b$, and login sets the access_token and refresh_token cookies.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/public/solid-clean/bookings", "issue": "When a private-link quote is reused, its status stays 'sent' and is not set to 'booking_started' (line 321 only sets lead_id, input, result and total). On payment it becomes 'accepted', so the data is fine. But until then the abandoned-booking quote counts as 'sent' for follow-up automations and the Business Manager's 'quotes awaiting a decision'. Optional: also set status 'booking_started'."},
+      {"endpoint": "POST /api/public/solid-clean/bookings", "issue": "A malformed quote_id (for example 'bad') returns 404 'Not found' because oid() raises inside the quote_token_ok check, so the booking fails instead of falling back to a new quote. The UI only sends quote_id after GET succeeds, so the risk is low. Suggested fix: check ObjectId.is_valid before the lookup."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Quote page after 'Book this quote' from the chat", "issues": ["The chat panel stays open over the right half of the Your Quote summary card and hides the totals. Consider closing or minimising the chat widget when chat-quote-book-btn is clicked."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter17_private_quote_links.py", "/app/test_reports/pytest/iter17.xml"],
+  "action_items": [
+    "Optional: when reusing a quote via a valid token, set status='booking_started' so it matches new quotes.",
+    "Optional: guard against a malformed quote_id in create_booking (ObjectId.is_valid) so it falls back to a new quote instead of returning 404.",
+    "Optional UX: close the chat panel after the 'Book this quote' click."
+  ],
+  "critical_code_review_comments": [
+    "quote_token_ok uses secrets.compare_digest and rejects empty or missing tokens, so old quotes saved without a token correctly return 404. This matches the user's choice.",
+    "routes_voice._email_quote adds a token to old quotes that have none and writes it back. Good.",
+    "Quote follow-up emails in automations.py have no booking link. Consider adding booking_link(...) with the token so follow-ups can be booked in one click.",
+    "If a customer on a prefilled regular quote goes Back to step 1 and clicks Continue, QuotePage sends them to /residential-cleaning/book and the q/t link is lost. This behaviour existed before this change."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter17_private_quote_links.py"],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100% (5/5 flows)"},
+  "seed_data_creation": "None kept. Cleaned up the TEST_PQ*, TEST_UI_PQ, TEST_Scratch and TEST_Chat leads, quotes, bookings, communications and the chat conversation. Also deleted the main agent's quote 6ad8a95c2c5d0c48f79d6626 (TEST_Private Link).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run with: cd /app/backend && REACT_APP_BACKEND_URL=... python -m pytest tests/test_iter17_private_quote_links.py -n 0 (pytest.ini has xdist; use -n 0 because the tests share module state). Leads are upserted by phone, so use a unique phone for each test contact. The admin login test ids are admin-login-email-input, admin-login-password-input and admin-login-submit-btn. On /c/solid-clean/quote, choosing the 'regular' service at step 0 redirects to /residential-cleaning/book; use end_of_tenancy for the from-scratch flow."
+}
