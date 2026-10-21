@@ -10,6 +10,7 @@ import { ChatThread } from "@/components/manager/ChatThread";
 import { Composer } from "@/components/manager/Composer";
 import { MemoryPanel } from "@/components/manager/MemoryPanel";
 import { Priorities } from "@/components/manager/Priorities";
+import { ModelPicker, VoiceSettings } from "@/components/manager/AiSettings";
 import { Alerts } from "@/components/manager/Alerts";
 import { Approvals } from "@/components/manager/Approvals";
 import { GrowthPlan } from "@/components/manager/GrowthPlan";
@@ -67,7 +68,11 @@ function Assistant() {
     <div className="grid gap-6 lg:grid-cols-[260px_1fr]" data-testid="manager-assistant">
       <aside className="hidden lg:block lg:h-[calc(100vh-220px)]">{list}</aside>
       <section className="flex min-h-[60vh] min-w-0 flex-col">
-        <button onClick={() => setSheet(true)} className="mb-3 flex items-center gap-2 self-start rounded-full border px-3 py-1.5 text-sm text-slate-600 lg:hidden" data-testid="manager-history-btn"><History className="h-4 w-4" />Conversations</button>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <button onClick={() => setSheet(true)} className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm text-slate-600 lg:hidden" data-testid="manager-history-btn"><History className="h-4 w-4" />Conversations</button>
+          <ModelPicker value={chat.model} onChange={chat.changeModel} />
+          <VoiceSettings voice={voice} />
+        </div>
         <div className="flex-1 pb-4">
           {chat.messages.length === 0 ? (
             <div className="py-6" data-testid="manager-empty-state">

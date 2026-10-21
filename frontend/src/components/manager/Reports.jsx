@@ -1,11 +1,46 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { FileText, Loader2 } from "lucide-react";
+import { FileText, Loader2, Square, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Empty, useLoad } from "@/components/admin/ui";
 import { api, errMsg, fmtDateTime } from "@/lib/api";
+
+const chunks = (t) => {
+  const plain = t.replace(/\|/g, " ").replace(/[#*_`>-]{1,}/g, " ").replace(/\s+/g, " ").trim();
+  const out = [];
+  let cur = "";
+  plain.split(/(?<=[.!?])\s+/).forEach((s) => { if ((cur + s).length > 3500) { out.push(cur); cur = ""; } cur += `${s} `; });
+  if (cur.trim()) out.push(cur);
+  return out;
+};
+
+const Listen = ({ text }) => {
+  const [state, setState] = useState("idle");
+  const audio = useRef(null);
+  const stop = useRef(false);
+  const play = async () => {
+    if (state !== "idle") { stop.current = true; audio.current?.pause(); setState("idle"); return; }
+    stop.current = false;
+    audio.current = audio.current || new Audio();
+    audio.current.play().catch(() => {});
+    setState("loading");
+    try {
+      for (const c of chunks(text)) {
+        if (stop.current) break;
+        const { data } = await api.post("/admin/manager/speak", { text: c }, { responseType: "blob" });
+        if (stop.current) break;
+        audio.current.src = URL.createObjectURL(data);
+        setState("playing");
+        await audio.current.play();
+        await new Promise((r) => { audio.current.onended = r; audio.current.onpause = r; });
+      }
+    } catch { toast.error("Couldn't play the report aloud. Please try again."); }
+    setState("idle");
+  };
+  return <Button size="sm" variant="outline" onClick={play} data-testid="report-listen-btn">{state === "loading" ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : state === "playing" ? <Square className="mr-1 h-3.5 w-3.5" /> : <Volume2 className="mr-1 h-3.5 w-3.5" />}{state === "idle" ? "Listen" : "Stop"}</Button>;
+};
 
 export const Reports = () => {
   const [list, reload] = useLoad("/admin/strategy/reports");
@@ -35,7 +70,7 @@ export const Reports = () => {
         {list?.length === 0 && <Empty>No reports yet.</Empty>}
       </div>
       <article className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5" data-testid="report-view">
-        {open ? <><p className="mb-3 font-mono text-[11px] text-slate-400">{fmtDateTime(open.created_at)}</p><div className="md-body"><ReactMarkdown remarkPlugins={[remarkGfm]}>{open.body}</ReactMarkdown></div></> : <Empty>{busy ? "Writing your report from live data…" : "Pick or create a report."}</Empty>}
+        {open ? <><div className="mb-3 flex items-center justify-between gap-2"><p className="font-mono text-[11px] text-slate-400">{fmtDateTime(open.created_at)}</p><Listen key={open.id} text={open.body} /></div><div className="md-body"><ReactMarkdown remarkPlugins={[remarkGfm]}>{open.body}</ReactMarkdown></div></> : <Empty>{busy ? "Writing your report from live data…" : "Pick or create a report."}</Empty>}
       </article>
     </div>
   );

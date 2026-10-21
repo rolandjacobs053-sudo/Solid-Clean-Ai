@@ -10,6 +10,7 @@ export function useManagerChat({ onReply, webRef }) {
   const [chatId, setChatId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [model, setModel] = useState("claude-sonnet-5-5");
   const ctrl = useRef(null);
 
   const patchLast = (fn) => setMessages((m) => m.map((x, i) => (i === m.length - 1 ? fn(x) : x)));
@@ -17,13 +18,18 @@ export function useManagerChat({ onReply, webRef }) {
   const open = useCallback(async (id) => {
     ctrl.current?.abort();
     if (!id) { setChatId(null); setMessages([]); return; }
-    try { const { data } = await api.get(`/admin/manager/chats/${id}`); setChatId(id); setMessages(data.messages); } catch (e) { toast.error(errMsg(e)); }
+    try { const { data } = await api.get(`/admin/manager/chats/${id}`); setChatId(id); setMessages(data.messages); setModel(data.model || "claude-sonnet-5-5"); } catch (e) { toast.error(errMsg(e)); }
   }, []);
+
+  const changeModel = useCallback(async (m) => {
+    setModel(m);
+    if (chatId) { try { await api.patch(`/admin/manager/chats/${chatId}`, { model: m }); } catch (e) { toast.error(errMsg(e)); } }
+  }, [chatId]);
 
   const send = useCallback(async (text, via, onCreated) => {
     let id = chatId;
     if (!id) {
-      try { id = (await api.post("/admin/manager/chats", {})).data.id; setChatId(id); } catch (e) { toast.error(errMsg(e)); return; }
+      try { id = (await api.post("/admin/manager/chats", { model })).data.id; setChatId(id); } catch (e) { toast.error(errMsg(e)); return; }
     }
     setMessages((m) => [...m, { role: "user", text, via, web: !!webRef?.current }, { role: "assistant", text: "", via, pending: true }]);
     setBusy(true);
@@ -57,8 +63,8 @@ export function useManagerChat({ onReply, webRef }) {
       setBusy(false);
       onCreated?.();
     }
-  }, [chatId, onReply, webRef]);
+  }, [chatId, onReply, webRef, model]);
 
   const stop = useCallback(() => ctrl.current?.abort(), []);
-  return { chatId, messages, busy, open, send, stop };
+  return { chatId, messages, busy, open, send, stop, model, changeModel };
 }

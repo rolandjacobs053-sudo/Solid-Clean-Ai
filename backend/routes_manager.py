@@ -2,7 +2,6 @@ import asyncio
 import io
 import json
 import logging
-import os
 import re
 from typing import List, Literal, Optional
 
@@ -60,6 +59,19 @@ VOICE_NOTE = "\nVOICE MODE: the owner is speaking and will HEAR your reply. Answ
 
 class ChatIn(BaseModel):
     title: str = Field(default="", max_length=120)
+    model: Optional[str] = None
+
+
+MODELS = {"claude-opus-5-5": "Claude Opus 5.5", "claude-sonnet-5-5": "Claude Sonnet 5.5", "claude-haiku-4-5-20251001": "Claude Haiku 4.5"}
+DEFAULT_MODEL = "claude-sonnet-5-5"
+VOICES = ("alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer")
+DEFAULT_PREFS = {"tts_model": "tts-1-hd", "voice": "sage", "speed": 1.0}
+
+
+class PrefsIn(BaseModel):
+    tts_model: Literal["tts-1", "tts-1-hd"] = "tts-1-hd"
+    voice: str = "sage"
+    speed: float = Field(default=1.0, ge=0.5, le=2.0)
 
 
 class MessageIn(BaseModel):
@@ -75,6 +87,8 @@ class MemoryIn(BaseModel):
 
 class SpeakIn(BaseModel):
     text: str = Field(min_length=1, max_length=8000)
+    voice: Optional[str] = None
+    tts_model: Optional[Literal["tts-1", "tts-1-hd"]] = None
 
 
 class PriorityPatch(BaseModel):
@@ -122,8 +136,8 @@ async def list_chats(q: str = ""):
 
 @router.post("/chats")
 async def create_chat(body: ChatIn):
-    doc = {"title": body.title or "New conversation", "messages": [], "created_at": now_iso(), "updated_at": now_iso()}
-    return {"id": str((await tdb.manager_chats.insert_one(doc)).inserted_id), **{k: doc[k] for k in ("title", "created_at")}}
+    doc = {"title": body.title or "New conversation", "model": body.model if body.model in MODELS else DEFAULT_MODEL, "messages": [], "created_at": now_iso(), "updated_at": now_iso()}
+    return {"id": str((await tdb.manager_chats.insert_one(doc)).inserted_id), **{k: doc[k] for k in ("title", "model", "created_at")}}
 
 
 @router.get("/chats/{cid}")
@@ -134,8 +148,37 @@ async def get_chat(cid: str):
 @router.patch("/chats/{cid}")
 async def rename_chat(cid: str, body: ChatIn):
     await _chat(cid)
-    await tdb.manager_chats.update_one({"_id": oid(cid)}, {"$set": {"title": body.title or "Untitled"}})
+    upd = {"title": body.title} if body.title else {}
+    if body.model:
+        if body.model not in MODELS:
+            raise HTTPException(400, "Unknown model")
+        upd["model"] = body.model
+    if upd:
+        await tdb.manager_chats.update_one({"_id": oid(cid)}, {"$set": upd})
     return {"ok": True}
+
+
+@router.get("/models")
+async def list_models():
+    return {"models": [{"id": k, "name": v} for k, v in MODELS.items()], "default": DEFAULT_MODEL, "voices": VOICES}
+
+
+async def get_prefs() -> dict:
+    p = await tdb.manager_prefs.find_one({}, {"_id": 0, "company_id": 0})
+    return {**DEFAULT_PREFS, **(p or {})}
+
+
+@router.get("/prefs")
+async def read_prefs():
+    return await get_prefs()
+
+
+@router.put("/prefs")
+async def save_prefs(body: PrefsIn):
+    if body.voice not in VOICES:
+        raise HTTPException(400, "Unknown voice")
+    await tdb.manager_prefs.update_one({}, {"$set": body.model_dump()}, upsert=True)
+    return await get_prefs()
 
 
 @router.delete("/chats/{cid}")
@@ -166,7 +209,7 @@ async def send(cid: str, body: MessageIn):
     if first and conv["title"] == "New conversation":
         upd["$set"]["title"] = body.text[:60] + ("…" if len(body.text) > 60 else "")
     await tdb.manager_chats.update_one({"_id": oid(cid)}, upd)
-    chat = new_chat(system, f"mgr-{cid}")
+    chat = new_chat(system, f"mgr-{cid}", ("anthropic", conv.get("model") if conv.get("model") in MODELS else DEFAULT_MODEL))
 
     async def save(text: str, stopped: bool = False, error: bool = False, suggestions: list = ()):
         if text or stopped or error:
@@ -245,8 +288,10 @@ async def speak(body: SpeakIn):
     text = _speakable(body.text)
     if not text:
         raise HTTPException(400, "Nothing to read aloud")
+    p = await get_prefs()
+    voice = body.voice if body.voice in VOICES else p["voice"]
     try:
-        audio = await OpenAITextToSpeech(api_key=LLM_KEY).generate_speech(text=text, model="tts-1", voice=os.environ.get("MANAGER_TTS_VOICE", "sage"), response_format="mp3")
+        audio = await OpenAITextToSpeech(api_key=LLM_KEY).generate_speech(text=text, model=body.tts_model or p["tts_model"], voice=voice, speed=p["speed"], response_format="mp3")
     except Exception:
         logger.exception("tts failed")
         raise HTTPException(502, "Voice playback failed. The written answer is still shown.")

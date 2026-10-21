@@ -102,3 +102,9 @@ Earlier history: started as an integrated Solid Clean system, then a multi-tenan
 - UI: "Search the web" switch in composer (disabled until connected), Live web research panel in Industry knowledge tab.
 - First publish requested 2026-10-21 (before research code); needs re-publish after key is added.
 
+
+## 2026-10-21 - Claude model picker + TTS settings
+- Business Manager per-conversation model: Claude Opus 5.5 (claude-opus-5-5), Sonnet 5.5 (default, claude-sonnet-5-5), Haiku 4.5 (claude-haiku-4-5-20251001). Stored on manager_chats.model; GET /api/admin/manager/models; PATCH /chats/{id} {model}. Rest of app stays on Sonnet 5.5 (core.LLM_MODEL).
+- TTS prefs (manager_prefs): default tts-1-hd, voice sage, speed 1.0; GET/PUT /api/admin/manager/prefs; /speak uses prefs (optional voice override). UI: model select + "Voice" popover (quality, voice, speed, preview); "Listen" on reports (chunked ~3500 chars, stop).
+- Verified via curl (Haiku + Opus chats stream, HD speak 200) and mobile screenshot. Not yet published. Perplexity key still not provided.
+
