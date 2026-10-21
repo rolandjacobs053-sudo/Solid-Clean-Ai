@@ -21,3 +21,10 @@ crons:
     endpoint: "{{BASE_URL}}/api/cron/manager-report/weekly"
     method: POST
     enabled: true
+  - name: manager-weekly-research
+    description: "Weekly live web research on cleaning-industry topics (Perplexity, capped) added to the knowledge base; skipped if no key"
+    cron: "0 5 * * 1"
+    timezone: "Europe/London"
+    endpoint: "{{BASE_URL}}/api/cron/manager-report/research"
+    method: POST
+    enabled: true

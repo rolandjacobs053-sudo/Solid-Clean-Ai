@@ -289,9 +289,20 @@ async def run_reports(kind: str):
         try:
             if not await tdb.settings.find_one({}, {"_id": 1}):
                 continue
+            if kind == "research":
+                from research import TOPICS, WEEKLY_CAP, connected, used_this_week
+                from routes_knowledge import research_to_knowledge
+                if not connected():
+                    return
+                week = now().isocalendar().week
+                for i in range(4):
+                    if await used_this_week() >= WEEKLY_CAP:
+                        break
+                    await research_to_knowledge(TOPICS[(week * 4 + i) % len(TOPICS)], "weekly_auto")
+                continue
             await build_report(kind)
         except Exception:
-            logger.exception("scheduled %s report failed for %s", kind, company.get("slug"))
+            logger.exception("scheduled %s failed for %s", kind, company.get("slug"))
 
 
 def _cron_auth(request: Request):
@@ -301,7 +312,7 @@ def _cron_auth(request: Request):
 
 
 @cron.post("/manager-report/{kind}")
-async def report_cron(kind: Literal["daily", "weekly"], request: Request, background: BackgroundTasks):
+async def report_cron(kind: Literal["daily", "weekly", "research"], request: Request, background: BackgroundTasks):
     _cron_auth(request)
     run_id = request.headers.get("x-webhook-id") or secrets.token_hex(8)
     if (await db.cron_runs.update_one({"_id": run_id}, {"$setOnInsert": {"at": now_iso(), "name": f"report-{kind}"}}, upsert=True)).upserted_id is None:

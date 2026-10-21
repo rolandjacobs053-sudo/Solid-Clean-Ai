@@ -94,3 +94,11 @@ Earlier history: started as an integrated Solid Clean system, then a multi-tenan
 
 
 
+
+## 2026-10-21 - Live web research (Perplexity) - code ready, KEY PENDING
+- research.py: Perplexity Agent API (POST /v1/agent preset "fast", fallback /v1/sonar), parses output_text/output/choices + search_results/citations; weekly cap 20 searches (research_log). Key env: PERPLEXITY_API_KEY (not set yet -> UI shows "not connected", endpoints return 409).
+- /api/admin/knowledge/research/status, POST /api/admin/knowledge/research (async job "research" -> lessons with citations, source_type web_research). Chat MessageIn.web=true runs a live search and injects cited results.
+- Cron manager-weekly-research Mon 05:00 London -> /api/cron/manager-report/research (4 rotating topics, skipped without key).
+- UI: "Search the web" switch in composer (disabled until connected), Live web research panel in Industry knowledge tab.
+- First publish requested 2026-10-21 (before research code); needs re-publish after key is added.
+

@@ -3,13 +3,14 @@ import hashlib
 import ipaddress
 import json
 import logging
+import os
 import re
 from html import unescape
 from typing import Literal, Optional
 from urllib.parse import parse_qs, urlparse
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ai import ai_complete
@@ -17,7 +18,7 @@ from core import now, now_iso, oid, out, outs, require_owner, tdb
 
 router = APIRouter(prefix="/api/admin/knowledge", dependencies=[Depends(require_owner)])
 logger = logging.getLogger(__name__)
-SOURCE_TYPES = ("web", "youtube", "book", "podcast", "social", "report", "case_study", "course", "other")
+SOURCE_TYPES = ("web", "youtube", "book", "podcast", "social", "report", "case_study", "course", "web_research", "other")
 LEVELS = ("verified", "reported", "claim", "opinion")
 BLOCKED = ("tiktok.com", "instagram.com", "facebook.com", "linkedin.com", "x.com", "twitter.com")
 FIELDS = ("title", "topic", "who", "achieved", "evidence", "evidence_level", "worked", "didnt_work", "relevance", "implementation", "cost", "metrics", "lesson", "region", "published")
@@ -171,6 +172,45 @@ async def ingest(body: IngestIn):
     return {**res, "source_title": meta["source_title"]}
 
 
+async def research_to_knowledge(topic: str, trigger: str) -> str:
+    from research import web_research
+    r = await web_research(topic, trigger)
+    if len(r["answer"]) < 200:
+        raise HTTPException(422, "The web search didn't return enough information on that topic.")
+    src = "\n".join(f"[{i + 1}] {s['title']} - {s['url']}" + (f" ({s['date']})" if s.get("date") else "") for i, s in enumerate(r["sources"]))
+    s = await tdb.settings.find_one({}, {"business.name": 1})
+    prompt = EXTRACT.format(biz=s["business"]["name"], n=6, topics="|".join(TOPICS), stype="live web research summary (cites numbered sources)", title=f"Web research: {topic}",
+                            url="multiple - see SOURCES", text=f"{r['answer']}\n\nSOURCES:\n{src}") + "\nIn 'evidence', name the numbered source(s) and their site. If a point has no source, mark it 'claim'."
+    raw = await ai_complete(prompt, "Extract the lessons now.")
+    items = json.loads(raw[raw.find("["): raw.rfind("]") + 1])
+    meta = {"source_url": r["sources"][0]["url"] if r["sources"] else None, "source_title": f"Web research: {topic[:120]}", "source_type": "web_research",
+            "citations": r["sources"], "retrieved_at": now_iso(), "added_by": trigger}
+    res = await store_items(items, meta)
+    await tdb.knowledge_sources.insert_one({**meta, "chars": len(r["answer"]), "lessons_added": res["added"], "created_at": now_iso()})
+    return f"{res['added']} lessons added, {res['duplicates']} duplicates skipped, {len(r['sources'])} sources"
+
+
+class ResearchIn(BaseModel):
+    topic: str = Field(min_length=8, max_length=300)
+
+
+@router.get("/research/status")
+async def research_status():
+    from research import status
+    return await status()
+
+
+@router.post("/research")
+async def research_now(body: ResearchIn, background: BackgroundTasks):
+    from research import connected, used_this_week, WEEKLY_CAP
+    from routes_strategy import _start
+    if not connected():
+        raise HTTPException(409, "Live web research isn't connected yet - add your Perplexity API key to switch it on.")
+    if await used_this_week() >= WEEKLY_CAP:
+        raise HTTPException(429, f"This week's research limit ({WEEKLY_CAP} searches) has been reached.")
+    return await _start("research", research_to_knowledge(body.topic, "owner"), background)
+
+
 @router.get("")
 async def list_items(q: str = "", topic: str = "", level: str = ""):
     query = {"status": {"$ne": "archived"}}
@@ -190,7 +230,7 @@ async def stats():
     count = lambda k: {v: len([i for i in items if i.get(k) == v]) for v in {i.get(k) for i in items}}  # noqa: E731
     return {"lessons": len(items), "sources": len({i.get("source_url") or i.get("source_title") for i in items}), "by_topic": count("topic"),
             "by_source_type": count("source_type"), "by_evidence": count("evidence_level"), "outdated": len([i for i in items if i["status"] == "outdated"]),
-            "topics": TOPICS, "source_types": SOURCE_TYPES, "live_web_research": "not connected - needs a paid search API (e.g. Perplexity) with owner approval"}
+            "topics": TOPICS, "source_types": SOURCE_TYPES, "live_web_research": "Perplexity connected" if os.environ.get("PERPLEXITY_API_KEY") else "not connected - add a Perplexity API key"}
 
 
 @router.patch("/{kid}")

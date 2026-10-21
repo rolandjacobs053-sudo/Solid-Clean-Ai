@@ -65,6 +65,7 @@ class ChatIn(BaseModel):
 class MessageIn(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
     via: Literal["text", "voice"] = "text"
+    web: bool = False
 
 
 class MemoryIn(BaseModel):
@@ -152,6 +153,14 @@ async def send(cid: str, body: MessageIn):
     titles = [c["title"] for c in await tdb.manager_chats.find({"_id": {"$ne": oid(cid)}}, {"title": 1}).sort("updated_at", -1).to_list(5)]
     transcript = "\n".join(f"{m['role'].upper()}: {m['text']}" for m in conv["messages"][-30:]) or "(new conversation)"
     system = SYSTEM.format(**ctx, voice=VOICE_NOTE if body.via == "voice" else "", titles=", ".join(titles) or "(none)", transcript=transcript)
+    if body.web:
+        from research import web_research
+        try:
+            r = await web_research(body.text, "chat")
+            src = "\n".join(f"[{i + 1}] {s['title']} - {s['url']}" for i, s in enumerate(r["sources"]))
+            system += f"\n\nLIVE WEB RESEARCH just run for this question (Perplexity). Use it, cite as [n] with the site name, and separate sourced facts from your own analysis:\n{r['answer'][:6000]}\nSOURCES:\n{src}"
+        except HTTPException as e:
+            system += f"\n\nThe owner asked for a live web search but it was not run: {e.detail}. Tell them this briefly, then answer from the knowledge base and data."
     first = not conv["messages"]
     upd = {"$push": {"messages": {"role": "user", "text": body.text, "via": body.via, "at": now_iso()}}, "$set": {"updated_at": now_iso()}}
     if first and conv["title"] == "New conversation":

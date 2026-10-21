@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { ExternalLink, Globe, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +53,46 @@ const Lesson = ({ k, onChange }) => {
   );
 };
 
+const Research = ({ onDone }) => {
+  const [st, reload] = useLoad("/admin/knowledge/research/status");
+  const [topic, setTopic] = useState("");
+  const [busy, setBusy] = useState(false);
+  const run = async (t) => {
+    setBusy(true);
+    try {
+      await api.post("/admin/knowledge/research", { topic: t });
+      for (let i = 0; i < 40; i += 1) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const { data } = await api.get("/admin/strategy/jobs/research");
+        if (data.status === "done") { toast.success(`Research complete: ${data.result_id}`); onDone(); break; }
+        if (data.status === "failed") { toast.error(data.error); break; }
+        if (i === 39) toast.message("Still researching - check back in a few minutes.");
+      }
+    } catch (e) { toast.error(errMsg(e)); }
+    setBusy(false);
+    reload();
+  };
+  if (!st) return null;
+  return (
+    <Panel title="Live web research (Perplexity)">
+      <div data-testid="knowledge-research-panel">
+        {!st.connected ? (
+          <p className="text-sm text-amber-800" data-testid="research-not-connected">Not connected yet. Create an API key at perplexity.ai/settings/api (pay-as-you-go, typically a few pence per search) and send it to me - it's stored only on the server. Until then, add sources by link or pasted text above.</p>
+        ) : (
+          <>
+            <p className="mb-3 text-sm text-slate-600" data-testid="research-usage">Every Monday 4 topics are researched automatically. <b>{st.used_this_week}</b> of {st.weekly_cap} searches used this week (cap keeps costs predictable).</p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. How UK cleaning firms win NHS or school contracts" data-testid="research-topic-input" />
+              <Button onClick={() => run(topic)} disabled={busy || topic.length < 8 || !st.remaining} className="bg-[#023F00] hover:bg-[#012b00]" data-testid="research-run-btn">{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Globe className="mr-2 h-4 w-4" />}{busy ? "Researching…" : "Research now"}</Button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">{st.topics.map((t, i) => <button key={i} disabled={busy || !st.remaining} onClick={() => run(t)} className="rounded-full border px-3 py-1 text-left text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50" data-testid={`research-topic-${i}`}>{t.split(" - ")[0]}</button>)}</div>
+          </>
+        )}
+      </div>
+    </Panel>
+  );
+};
+
 export const Knowledge = () => {
   const [q, setQ] = useState("");
   const [f, setF] = useState({ q: "", topic: "" });
@@ -63,6 +103,7 @@ export const Knowledge = () => {
     <div className="grid gap-6" data-testid="manager-knowledge">
       {st && <p className="text-sm text-slate-600" data-testid="knowledge-stats"><b>{st.lessons}</b> lessons from <b>{st.sources}</b> sources the system has actually read. Verified/reported: {(st.by_evidence.verified || 0) + (st.by_evidence.reported || 0)} · claims/opinions: {(st.by_evidence.claim || 0) + (st.by_evidence.opinion || 0)} · flagged outdated: {st.outdated}. Live web search: {st.live_web_research}.</p>}
       <AddSource types={st?.source_types || ["web"]} onAdded={refresh} />
+      <Research onDone={refresh} />
       <div className="flex flex-wrap gap-2">
         <form className="relative min-w-[220px] flex-1" onSubmit={(e) => { e.preventDefault(); setF({ ...f, q }); }}><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search lessons" className="pl-9" data-testid="knowledge-search-input" /></form>
         <Select value={f.topic || "all"} onValueChange={(x) => setF({ ...f, topic: x === "all" ? "" : x })}><SelectTrigger className="w-56" data-testid="knowledge-topic-select"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All topics</SelectItem>{(st?.topics || []).map((t) => <SelectItem key={t} value={t} className="capitalize">{label(t)}</SelectItem>)}</SelectContent></Select>

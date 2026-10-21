@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PageHeader } from "@/components/admin/ui";
+import { PageHeader, useLoad } from "@/components/admin/ui";
 import { ChatList } from "@/components/manager/ChatList";
 import { ChatThread } from "@/components/manager/ChatThread";
 import { Composer } from "@/components/manager/Composer";
@@ -27,6 +27,10 @@ function Assistant() {
   const [sheet, setSheet] = useState(false);
   const [toDelete, setToDelete] = useState(null);
   const [handsFree, setHandsFree] = useState(false);
+  const [web, setWeb] = useState(false);
+  const webRef = useRef(false);
+  webRef.current = web;
+  const [research] = useLoad("/admin/knowledge/research/status");
   const [saved, setSaved] = useState(new Set());
   const hf = useRef(false);
   hf.current = handsFree;
@@ -36,7 +40,7 @@ function Assistant() {
   const loadChats = useCallback((q = query) => api.get("/admin/manager/chats", { params: { q } }).then((r) => setChats(r.data)).catch((e) => toast.error(errMsg(e))), [query]);
   const voiceRef = useRef(null);
   const onReply = useCallback((text, via) => { if (via === "voice") voiceRef.current.speak(text, () => hf.current && voiceRef.current.start(false)); }, []);
-  const chat = useManagerChat({ onReply });
+  const chat = useManagerChat({ onReply, webRef });
   const onTranscript = useCallback((t) => chat.send(t, "voice", () => loadChats()), [chat, loadChats]);
   const voice = useVoice({ onTranscript, onError: (m) => toast.error(m) });
   voiceRef.current = voice;
@@ -75,7 +79,7 @@ function Assistant() {
           ) : <ChatThread messages={chat.messages} onSpeak={(t) => { voice.unlock(); voice.speak(t); }} onRemember={remember} saved={saved} />}
           <div ref={endRef} />
         </div>
-        <Composer busy={chat.busy} thinking={chat.busy && chat.messages[chat.messages.length - 1]?.via === "voice"} voice={voice} support={support} handsFree={handsFree} setHandsFree={setHandsFree} onSend={send}
+        <Composer busy={chat.busy} web={web} setWeb={setWeb} research={research} thinking={chat.busy && chat.messages[chat.messages.length - 1]?.via === "voice"} voice={voice} support={support} handsFree={handsFree} setHandsFree={setHandsFree} onSend={send}
           onStop={() => { chat.stop(); voice.stopSpeaking(); }} onMic={mic} onVoiceStop={() => (voice.state === "speaking" ? voice.stopSpeaking() : voice.state === "idle" ? chat.stop() : voice.stop(true))} />
       </section>
       <Sheet open={sheet} onOpenChange={setSheet}><SheetContent side="left" className="w-[85vw] max-w-sm"><SheetHeader><SheetTitle>Conversations</SheetTitle></SheetHeader><div className="mt-4 h-[80vh]">{list}</div></SheetContent></Sheet>

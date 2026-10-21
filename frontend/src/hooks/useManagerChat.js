@@ -6,7 +6,7 @@ const readError = async (res) => {
   try { const j = await res.json(); return typeof j.detail === "string" ? j.detail : "Request failed"; } catch { return `Request failed (${res.status})`; }
 };
 
-export function useManagerChat({ onReply }) {
+export function useManagerChat({ onReply, webRef }) {
   const [chatId, setChatId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -25,12 +25,12 @@ export function useManagerChat({ onReply }) {
     if (!id) {
       try { id = (await api.post("/admin/manager/chats", {})).data.id; setChatId(id); } catch (e) { toast.error(errMsg(e)); return; }
     }
-    setMessages((m) => [...m, { role: "user", text, via }, { role: "assistant", text: "", via, pending: true }]);
+    setMessages((m) => [...m, { role: "user", text, via, web: !!webRef?.current }, { role: "assistant", text: "", via, pending: true }]);
     setBusy(true);
     ctrl.current = new AbortController();
     let full = "";
     try {
-      const res = await fetch(`${API}/admin/manager/chats/${id}/messages`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, via }), signal: ctrl.current.signal });
+      const res = await fetch(`${API}/admin/manager/chats/${id}/messages`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, via, web: !!webRef?.current }), signal: ctrl.current.signal });
       if (!res.ok) throw new Error(await readError(res));
       const reader = res.body.getReader();
       const dec = new TextDecoder();
@@ -57,7 +57,7 @@ export function useManagerChat({ onReply }) {
       setBusy(false);
       onCreated?.();
     }
-  }, [chatId, onReply]);
+  }, [chatId, onReply, webRef]);
 
   const stop = useCallback(() => ctrl.current?.abort(), []);
   return { chatId, messages, busy, open, send, stop };

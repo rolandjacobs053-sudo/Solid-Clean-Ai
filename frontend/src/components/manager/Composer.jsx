@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, Mic, Send, Square, VolumeX } from "lucide-react";
+import { Globe, Loader2, Mic, Send, Square, VolumeX } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -17,7 +17,7 @@ const VoiceBar = ({ state, level, onStop }) => (
   </div>
 );
 
-export const Composer = ({ busy, thinking, voice, support, handsFree, setHandsFree, onSend, onStop, onMic, onVoiceStop }) => {
+export const Composer = ({ busy, thinking, web, setWeb, research, voice, support, handsFree, setHandsFree, onSend, onStop, onMic, onVoiceStop }) => {
   const [text, setText] = useState("");
   const submit = () => { if (!text.trim() || busy) return; onSend(text.trim()); setText(""); };
   const vs = voice.state === "idle" && thinking ? "thinking" : voice.state;
@@ -34,6 +34,10 @@ export const Composer = ({ busy, thinking, voice, support, handsFree, setHandsFr
           : <button onClick={submit} disabled={!text.trim()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#023F00] text-white disabled:opacity-40" aria-label="Send" data-testid="manager-send-btn"><Send className="h-5 w-5" /></button>}
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-500">
+        <label className={`flex items-center gap-2 ${research?.connected ? "" : "opacity-60"}`} title={research?.connected ? `${research.remaining} of ${research.weekly_cap} web searches left this week` : "Add a Perplexity API key to enable live web search"}>
+          <Switch checked={web} onCheckedChange={setWeb} disabled={!research?.connected || !research?.remaining} data-testid="manager-web-switch" /><Globe className="h-3.5 w-3.5" />
+          {research?.connected ? `Search the web (${research.remaining} left this week)` : "Web search: not connected"}
+        </label>
         {support.ok
           ? <label className="flex items-center gap-2"><Switch checked={handsFree} onCheckedChange={setHandsFree} data-testid="manager-handsfree-switch" />Hands-free: keep listening after each spoken reply</label>
           : <span className="text-amber-700" data-testid="manager-voice-unsupported">Voice unavailable: {support.reason}</span>}
