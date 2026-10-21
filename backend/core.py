@@ -1,3 +1,4 @@
+import ipaddress
 import os
 from contextvars import ContextVar
 from datetime import datetime, timezone, timedelta
@@ -56,6 +57,29 @@ def now():
 
 def now_iso():
     return now().isoformat()
+
+
+PROXY_NETS = [ipaddress.ip_network(n) for n in (
+    "173.245.48.0/20", "103.21.244.0/22", "103.22.200.0/22", "103.31.4.0/22", "141.101.64.0/18", "108.162.192.0/18",
+    "190.93.240.0/20", "188.114.96.0/20", "197.234.240.0/22", "198.41.128.0/17", "162.158.0.0/15", "104.16.0.0/13",
+    "104.24.0.0/14", "172.64.0.0/13", "131.0.72.0/22", "2400:cb00::/32", "2606:4700::/32", "2803:f800::/32",
+    "2405:b500::/32", "2405:8100::/32", "2a06:98c0::/29", "2c0f:f248::/32")]
+
+
+def _is_proxy(a: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(a)
+    except ValueError:
+        return True
+    return not ip.is_global or any(ip in n for n in PROXY_NETS if n.version == ip.version)
+
+
+def client_ip(request: Request) -> str:
+    # trust only the right end of X-Forwarded-For: drop the load balancer hop, then CDN hops
+    parts = [p.strip() for p in (request.headers.get("x-forwarded-for") or "").split(",") if p.strip()][:-1]
+    while parts and _is_proxy(parts[-1]):
+        parts.pop()
+    return parts[-1] if parts else (request.client.host if request.client else "x")
 
 
 def days_ago_iso(days: int):

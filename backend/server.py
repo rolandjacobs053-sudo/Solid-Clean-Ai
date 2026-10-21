@@ -14,6 +14,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
+from core import client_ip
+
 import routes_admin
 import routes_auth
 import routes_chat
@@ -54,7 +56,7 @@ async def rate_limit(request: Request, call_next):
     path = request.url.path
     limit = next((n for p, n in LIMITS if path.startswith(p)), None)
     if limit:
-        ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "x")).split(",")[0].strip()
+        ip = client_ip(request)
         q, t = HITS[(ip, path.split("/")[2])], time.monotonic()
         while q and t - q[0] > 60:
             q.popleft()

@@ -3,7 +3,7 @@ from datetime import timedelta, datetime, timezone
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from core import create_token, db, decode_token, oid, out, verify_password, now
+from core import client_ip, create_token, db, decode_token, oid, out, verify_password, now
 
 router = APIRouter(prefix="/api/auth")
 
@@ -23,20 +23,20 @@ def set_auth_cookies(response: Response, user_id: str, email: str):
 @router.post("/login")
 async def login(body: LoginIn, request: Request, response: Response):
     email = body.email.lower().strip()
-    ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "x")).split(",")[0].strip()
-    ident = f"{ip}:{email}"
-    attempt = await db.login_attempts.find_one({"identifier": ident})
-    if attempt and attempt.get("count", 0) >= 5:
-        locked_at = datetime.fromisoformat(attempt["last"])
-        if now() - locked_at < timedelta(minutes=15):
-            raise HTTPException(429, "Too many failed attempts. Try again in 15 minutes.")
-        await db.login_attempts.delete_one({"identifier": ident})
+    idents = {f"{client_ip(request)}:{email}": 5, f"acct:{email}": 10}
+    for ident, cap in idents.items():
+        attempt = await db.login_attempts.find_one({"identifier": ident})
+        if attempt and attempt.get("count", 0) >= cap:
+            if now() - datetime.fromisoformat(attempt["last"]) < timedelta(minutes=15):
+                raise HTTPException(429, "Too many failed attempts. Try again in 15 minutes.")
+            await db.login_attempts.delete_one({"identifier": ident})
     user = await db.users.find_one({"email": email})
     if not user or user.get("active") is False or not verify_password(body.password, user["password_hash"]):
-        await db.login_attempts.update_one({"identifier": ident},
-                                           {"$inc": {"count": 1}, "$set": {"last": now().isoformat()}}, upsert=True)
+        for ident in idents:
+            await db.login_attempts.update_one({"identifier": ident},
+                                               {"$inc": {"count": 1}, "$set": {"last": now().isoformat()}}, upsert=True)
         raise HTTPException(401, "Invalid email or password")
-    await db.login_attempts.delete_one({"identifier": ident})
+    await db.login_attempts.delete_many({"identifier": {"$in": list(idents)}})
     set_auth_cookies(response, str(user["_id"]), email)
     user.pop("password_hash", None)
     return out(user)

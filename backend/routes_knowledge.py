@@ -7,7 +7,7 @@ import os
 import re
 from html import unescape
 from typing import Literal, Optional
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urljoin, urlparse
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -76,8 +76,19 @@ async def _guard(url: str):
         infos = await asyncio.get_running_loop().getaddrinfo(host, None)
     except OSError:
         raise HTTPException(422, "That web address couldn't be found.")
-    if any(not ipaddress.ip_address(i[4][0]).is_global for i in infos):
+    ips = [ipaddress.ip_address(i[4][0].split("%")[0]) for i in infos]
+    if not ips or any(not (getattr(ip, "ipv4_mapped", None) or ip).is_global for ip in ips):
         raise HTTPException(422, "That address points to a private network and can't be read.")
+    return str(ips[0])
+
+
+async def _pinned_get(c: httpx.AsyncClient, url: str) -> httpx.Response:
+    # connect to the IP we validated so DNS can't change between check and fetch
+    ip = await _guard(url)
+    p = urlparse(url)
+    host = f"[{ip}]" if ":" in ip else ip
+    port = f":{p.port}" if p.port else ""
+    return await c.get(p._replace(netloc=host + port).geturl(), headers={"Host": p.hostname + port}, extensions={"sni_hostname": p.hostname})
 
 
 async def fetch_source(url: str) -> tuple[str, str, str]:
@@ -99,13 +110,12 @@ async def fetch_source(url: str) -> tuple[str, str, str]:
         return f"{meta.get('title', 'YouTube video')} - {meta.get('author_name', '')}".strip(" -"), text, "youtube"
     try:
         async with httpx.AsyncClient(timeout=20, follow_redirects=False, headers={"User-Agent": "SolidCleanResearchBot/1.0 (business research; contact info@solidcleanltd.com) httpx"}) as c:
-            r = await c.get(url)
+            r, cur = await _pinned_get(c, url), url
             for _ in range(5):
                 if not r.is_redirect:
                     break
-                nxt = str(r.next_request.url)
-                await _guard(nxt)
-                r = await c.get(nxt)
+                cur = urljoin(cur, r.headers["location"])
+                r = await _pinned_get(c, cur)
     except httpx.HTTPError:
         raise HTTPException(502, "Couldn't reach that web page. Check the address or paste the text instead.")
     if r.status_code in (401, 402, 403):

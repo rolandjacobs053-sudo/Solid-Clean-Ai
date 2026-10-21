@@ -115,6 +115,13 @@ Earlier history: started as an integrated Solid Clean system, then a multi-tenan
 - Verified via curl: chat web=true returned cited London EoT prices; "Research now" job added 6 lessons from 8 sources (test data then deleted). Screenshot desktop+mobile: switch enabled "Search the web (20 left this week)".
 - Re-publish dispatched 2026-10-21 (model picker, HD voice, Listen button, free web research).
 
+## 2026-10-21 - Security audit fixes (SEC-001, SEC-002, login lockout)
+- CORS: backend/.env CORS_ORIGINS now exact list (https://solidcleanltd.com, https://www.solidcleanltd.com, preview URL) instead of "*" with credentials. Verified evil Origin gets no ACAO; preview origin allowed.
+- SSRF: routes_knowledge._guard returns the validated IP (also blocks IPv4-mapped IPv6); _pinned_get connects to that IP with Host header + sni_hostname (TLS still verified against hostname); redirects re-validated hop by hop via urljoin. Verified metadata/localhost/::ffff:127.0.0.1/redirect-to-127.0.0.1 blocked; normal sites fetch.
+- Login: core.client_ip() takes X-Forwarded-For from the trusted right end (drops LB hop + Cloudflare/private hops); used by login lockout and rate-limit middleware. Added account-level lockout (10 fails/15 min per email) on top of per-IP+email (5). Verified spoofed XFF no longer resets the counter.
+- Deferred (owner's choice): public quote IDOR token, server-side logout revocation, payment status summary exposure.
+
 ## Backlog
+- Security P3 (deferred): per-quote token for public quote lookups, server-side session revocation on logout, trim /api/payments/status response.
 - P0 Contract generation & e-signatures. P1 Congestion/ULEZ/travel cost calculator. P2 Google Reviews (needs Places key), Twilio phone receptionist (needs credentials). Optional: Perplexity key for deeper research.
 
